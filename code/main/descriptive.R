@@ -30,12 +30,14 @@ source(here::here("code","functions.R"))
 datadir <- "C:/Users/phpuenig/Documents/COVID-19/Data/"
 
 # Data version - spi-m linelists versus pipeline
-data <- "dat_alt.rds" 
+data <- "dat_deaths_2020-08-01_2020-10-31.rds" 
 # data <- "dat.rds" 
 
+period <- unlist(strsplit(gsub(".rds","",data), split = "_"))[3:4]
+
 # Figure output directory
-figdir <- "figures"
-# figdir <- "figures/second_wave"
+# figdir <- "figures/first_wave"
+figdir <- "figures/second_wave"
 
 ## Shapefiles
 regions <- readRDS(paste0(datadir,"maps/LA_shp_wpops.rds")) %>%
@@ -47,9 +49,7 @@ regions.df <- st_drop_geometry(regions)
 g <- inla.read.graph(filename = paste0(datadir,"maps/regions_eng.adj"))
 
 # LTLA-week-aggregated observed deaths, expected deaths and LTLA covariates
-dat <- readRDS(paste0(datadir, paste0("Deaths/", data))) %>%
-  filter(wod < ymd("2020-08-02")) %>% # Last week of July
-  mutate(pop_dens = pop_dens_total) 
+dat <- readRDS(paste0(datadir, paste0("Deaths/", data))) 
 
 theme_set(theme_minimal())
 
@@ -116,6 +116,7 @@ dat %>%
   geom_vline(aes(xintercept = jitter(peak), col = lad19cd), alpha = 0.3) +
   geom_line(alpha = 0.3) +
   labs(title = "COVID19-related deaths in England, by LTLA and week of death",
+       subtitle = paste(period[1],"-",period[2]),
        x = "Calendar week",
        y = "Deaths per 100,000"
        # subtitle = paste0("Data up to ", max(lubridate::ymd(covid_deaths$dor))),
@@ -152,7 +153,8 @@ dat %>%
   summarise(n = sum(n)) %>% 
   full_join(regions) %>%
   basic_map(fill = "n", rate1e5 = TRUE) +
-  ggtitle("Total deaths per 100,000") -> map_tot
+  labs(title = "Total deaths per 100,000",
+       subtitle = paste(period[1],"-",period[2])) -> map_tot
 
 dat %>%
   group_by(lad19cd) %>%

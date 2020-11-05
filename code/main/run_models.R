@@ -33,11 +33,7 @@ regions.df <- st_drop_geometry(regions)
 g <- inla.read.graph(filename = paste0(datadir,"maps/regions_eng.adj"))
 
 # LTLA-week-aggregated observed deaths, expected deaths and LTLA covariates
-dat <- readRDS(paste0(datadir, "Deaths/dat_alt.rds")) %>%
-  filter(wod < ymd("2020-08-02")) %>% # filter to last week in July
-  mutate(pop_dens = pop_dens_total,
-         logpopdens = log(pop_dens)) %>%
-  mutate_at(vars("IMD","prop_kw", "prop_minority","logpopdens"), scale)
+dat <- readRDS(paste0(datadir, "Deaths/dat_deaths_2020-01-01_2020-06-30.rds"))
 
 ################################################################################
 # PRIOR SPECIFICATION
@@ -118,7 +114,7 @@ f_base_geog <- n ~
 
 ## IID spatial
 f_iid <- n ~ 
-   IMD + prop_minority + log(pop_dens) + 
+   IMD + prop_minority + log(pop_dens) +
    #prop_kw +
    #tb_inc + #cv_mort + can_mort +
   f(w, model = "rw1",
@@ -155,7 +151,7 @@ f_iid_geog <- n ~
 
 ## BYM spatial
 f_bym <- n ~ 
-   IMD + prop_minority + log(pop_dens) + 
+   IMD + prop_minority + log(pop_dens) +
   f(w, model = "rw1",
     hyper = list(prec = prior.prec.tp),
     values = seq(min(dat$w),max(dat$w)),
@@ -216,9 +212,9 @@ f_bym_geog_nocovs <- n ~
 formulae <- list(base = f_base, base_geog = f_base_geog, iid = f_iid, iid_geog = f_iid_geog, BYM = f_bym, BYM_geog = f_bym_geog, BYM_geog_nocovs = f_bym_geog_nocovs)
 fits <- lapply(formulae, fit_mod, dat)
 
-saveRDS(fits, file = "./output/fits_pipeline.rds")
+saveRDS(fits, file = "output/fits_final_1stwave.rds")
 
 ## Draw posterior samples ##
 samples <- lapply(fits, inla.posterior.sample,n = 1000)
-saveRDS(samples, file = "./output/samples_pipeline.rds")
+saveRDS(samples, file = "output/samples_final_1stwave.rds")
 
