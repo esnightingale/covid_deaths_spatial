@@ -38,10 +38,10 @@ alldata <- alldata %>%
 
 # Aggregate by week and LA
 alldata %>%
-  group_by(lad19cd, wod) %>%
+  group_by(lad19cd, wod, ltla_first) %>%
   count() %>%
-  full_join(la_pops) %>%
   ungroup() %>%
+  full_join(la_pops) %>%
   mutate(n = replace_na(n, 0),
          w = as.integer(lubridate::week(wod)),
          SIR_wk = n/la_wk_E,
@@ -53,9 +53,9 @@ alldata %>%
   count(name = "n_total") %>%
   full_join(la_pops) %>%
   mutate(n_total = replace_na(n_total, 0),
-         SMR = n_total/la_tot_E) %>%
+         SIR = n_total/la_tot_E) %>%
   ungroup() %>%
-  mutate(SMR_grp = cut(SMR, breaks = 5, include.lowest = T, ordered_result = T)) -> d_agg_tot
+  mutate(SIR_grp = cut(SIR, breaks = 5, include.lowest = T, ordered_result = T)) -> d_agg_tot
 
 
 # --------------------------------------------------------------------------------------------#
@@ -68,10 +68,8 @@ dat <- d_agg_wk %>%
   left_join(covs) %>% 
   rename(E = la_tot_E,
          E_wk = la_wk_E) %>%
-  group_by(lad19cd) %>%
-  mutate(first = lubridate::week(ltla_first)) %>%
-  ungroup() %>%
-  mutate(first_overall = min(lubridate::week(ltla_first)),
+  mutate(first = lubridate::week(lubridate::floor_date(ltla_first, unit = "week")),
+         first_overall = min(first),
          date_first_overall = min(ltla_first, na.rm = T)) %>%
   mutate(n = replace_na(n, 0),
          geog = as.numeric(as.factor(geography)),

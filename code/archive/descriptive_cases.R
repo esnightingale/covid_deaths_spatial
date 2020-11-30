@@ -30,8 +30,18 @@ source(here::here("code","functions.R"))
 datadir <- "C:/Users/phpuenig/Documents/COVID-19/Data/"
 
 # Data version - spi-m linelists versus pipeline
-data <- "dat.rds" 
+# data <- "dat.rds" 
 # data <- "dat_alt.rds" 
+ 
+cases <- "Cases/dat_cases_2020-01-01_2020-06-30.rds" 
+cases2 <- "Cases/dat_cases_2020-07-01_2020-11-05.rds" 
+deaths <- "Deaths/dat_deaths_2020-01-01_2020-06-30.rds" 
+
+period <- unlist(strsplit(gsub(".rds","",cases), split = "_"))[3:4]
+period2 <- unlist(strsplit(gsub(".rds","",cases2), split = "_"))[3:4]
+
+# period <- c(min(cases$wos), max(cases$wos))
+# period2 <- c(min(cases2$wos), max(cases2$wos))
 
 # Figure output directory
 figdir <- "figures/Cases"
@@ -44,23 +54,40 @@ regions <- readRDS(paste0(datadir,"maps/LA_shp_wpops.rds")) %>%
 # Cleaned linelist of cases
 alldata <- readRDS(paste0(datadir, "Cases/alldata.rds"))
 
-# LTLA-week-aggregated observed deaths, expected deaths and LTLA covariates
-dat <- readRDS(paste0(datadir, paste0("Cases/", data))) %>%
-  filter(wor < ymd("2020-08-02")) %>% 
-  mutate(pop_dens = pop_dens_total) 
+cases <- readRDS(paste0(datadir, cases)) 
+cases2 <- readRDS(paste0(datadir, cases2)) 
+
+# dat <- readRDS(paste0(datadir, paste0("Cases/", data))) %>%
+#   filter(wor < ymd("2020-08-02")) %>% 
+#   mutate(pop_dens = pop_dens_total) 
 
 # LTLA-week-aggregated observed deaths, expected deaths and LTLA covariates
-deaths <- readRDS(paste0(datadir, paste0("Deaths/", "dat_alt.rds"))) %>%
-  filter(wod < ymd("2020-08-02")) %>% 
-  mutate(pop_dens = pop_dens_total) 
+deaths <- readRDS(paste0(datadir, deaths)) 
+
+# deaths <- readRDS(paste0(datadir, paste0("Deaths/", "dat_alt.rds"))) %>%
+#   filter(wod < ymd("2020-08-02")) %>% 
+#   mutate(pop_dens = pop_dens_total) 
 
 theme_set(theme_minimal())
 
 # ---------------------------------------------------------------------------- #
+# Time series - total
+
+png(here::here(figdir,"total_specdate_bypillar.png"), height = 600, width = 1000, res = 150)
+alldata %>%
+  mutate(pillar = factor(pillar, levels = c("pillar_1","pillar_2"), labels = c("Pillar 1","Pillar 2"))) %>%
+  ggplot(aes(x = dos, fill = pillar)) +
+  geom_bar() + 
+  labs(x = "Date of specimen", y = "Count", fill = "") + 
+  theme(legend.position = c(0.8, 0.9))
+dev.off()
+
+# ---------------------------------------------------------------------------- #
+
 
 ## TIME SERIES - BY LTLA ##
 
-dat %>%
+cases %>%
   group_by(lad19cd) %>%
   mutate(peak = w[which.max(n)]) %>% 
   arrange(peak) %>%
@@ -75,7 +102,7 @@ dat %>%
   guides(col = F) +
   scale_colour_viridis_d(option = "cividis")  -> ts_by_wk
 
-dat %>%
+cases %>%
   group_by(lad19cd) %>%
   mutate(peak = wk_since_first[which.max(n)]) %>% 
   arrange(peak) %>%
@@ -99,16 +126,25 @@ dev.off()
 
 ## MAP TOTALS ##
 
-dat %>%
+cases %>%
   group_by(lad19cd) %>%
   summarise(n = sum(n),
             la_pop = unique(la_pop),
             rate = sum(n)*1e5/unique(la_pop)) %>% 
   full_join(regions) %>%
   basic_map(fill = "rate") +
-  ggtitle("Total cases per 100,000") -> map_tot
+  labs(title = "Total cases per 100,000", subtitle = paste0(period[1]," - ",period[2])) -> map_tot
 
-dat %>%
+cases2 %>%
+  group_by(lad19cd) %>%
+  summarise(n = sum(n),
+            la_pop = unique(la_pop),
+            rate = sum(n)*1e5/unique(la_pop)) %>% 
+  full_join(regions) %>%
+  basic_map(fill = "rate") +
+  labs(subtitle = paste0(period2[1]," - ",period2[2])) -> map_tot2
+
+cases %>%
   group_by(lad19cd) %>%
   summarise(rate = unique(E)*1e5/unique(la_pop)) %>% 
   full_join(regions) %>%
@@ -117,6 +153,11 @@ dat %>%
 
 png(here::here(figdir,"map_totals.png"), height = 800, width = 1200, res = 150)
 map_tot + map_E
+dev.off()
+
+png(here::here(figdir,"map_totals_compwaves.png"), height = 800, width = 1200, res = 150)
+# pdf(here::here(figdir,"map_totals_compwaves.pdf"), height = 7, width = 12)
+map_tot + map_tot2
 dev.off()
 
 ## Pillar 1 vs 2
@@ -130,21 +171,23 @@ dev.off()
 #   geom_histogram(position = "dodge")
 
 alldata %>%
-  filter(pillar == "pillar_1") %>%
+  filter(pillar == "pillar_1",
+         dos >= period[1] & dos <= period[2]) %>%
   group_by(lad19cd) %>%
   summarise(n = n()) %>%   #  sum(n, na.rm = T)) %>%
   full_join(regions) %>%
   basic_map(fill = "n", rate1e5 = TRUE) +
-  labs(subtitle = "Cases per 100,000", title = "Pillar 1 testing") -> map_pillar1
+  labs(title = "Cases per 100,000", subtitle = "Pillar 1 testing") -> map_pillar1
 
 
 alldata %>%
-  filter(pillar == "pillar_2") %>%
+  filter(pillar == "pillar_2",
+         dos >= period[1] & dos <= period[2]) %>%
   group_by(lad19cd) %>%
   summarise(n = n()) %>%   #  sum(n, na.rm = T)) %>%
   full_join(regions) %>%
   basic_map(fill = "n", rate1e5 = TRUE) +
-  labs(subtitle = "Cases per 100,000", title = "Pillar 2 testing") -> map_pillar2
+  labs(subtitle = "Pillar 2 testing") -> map_pillar2
 
 ## Deaths
 
@@ -153,10 +196,11 @@ deaths %>%
   summarise(n = sum(n)) %>% 
   full_join(regions) %>%
   basic_map(fill = "n", rate1e5 = TRUE) +
-  ggtitle("Total deaths per 100,000") -> map_deaths
+  ggtitle("Deaths per 100,000") -> map_deaths
 
 png(here::here(figdir,"map_deaths_cases.png"), height = 600, width = 1800, res = 150)
-map_deaths + map_pillar1 + map_pillar2 
+map_deaths + map_pillar1 + map_pillar2 +
+  plot_annotation(caption = paste0("Data between",period[1]," - ",period[2]))
 dev.off()
 
 # ---------------------------------------------------------------------------- #
