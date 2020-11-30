@@ -24,7 +24,7 @@ basic_map <- function(sf, fill, rate1e5 = F){
   }else{sf <- mutate(sf, fill = !!sym(fill))}
   
   p <- ggplot(sf, aes(geometry = geometry, fill = fill)) +
-    geom_sf() +
+    geom_sf(colour = NA) +
     scale_fill_viridis_c() +
     labs(fill = "") +
     annotation_scale(location = "br") +

@@ -23,6 +23,10 @@ library(cowplot)
 
 theme_set(theme_minimal())
 
+
+measure <- "deaths"
+wave <- 1
+
 # Geography breakdown
 regions %>%
   st_drop_geometry() %>%
@@ -31,26 +35,29 @@ regions %>%
   mutate(percent = 100*n/nrow(regions)) -> geog_summ
 
 
-# Primary dataset:
-dat <- readRDS(paste0(datadir, "Deaths/dat_alt.rds")) %>%
-  filter(wod < ymd("2020-08-02")) %>% # filter to last week in July
-  mutate(pop_dens = pop_dens_total,
-         logpopdens = log(pop_dens)) %>%
-  mutate_at(vars("IMD","prop_kw", "prop_minority","logpopdens"), scale)
+# LTLA-week-aggregated observed deaths, expected deaths and LTLA covariates
+# (first and second waves)
+dat_all <- readRDS(here::here("data",paste0(measure,".rds")))
 
-alldata <- readRDS(paste0(datadir, "Deaths/alldata_alt.rds")) %>%
-  filter(wod < ymd("2020-08-02")) # filter to last week in July
+dat <- dat_all[[wave]]
+period <- dat_all$breaks[[wave]]
+
+linelist <- readRDS(paste0(datadir, sprintf("linelist_%s.rds",measure))) 
+
+# %>%
+#   filter(wod < ymd("2020-08-02")) # filter to last week in July
 # covid_deaths_raw <- readRDS(paste0(datadir, "Deaths/covid_deaths_raw.rds"))
 # covid_deaths_E <- readRDS(paste0(datadir, "Deaths/covid_deaths_E.rds"))
 
 weekrange <- seq(min(dat$w), max(dat$w))
 
 # Fitted models and posterior samples
-suf <- "_pipeline"
 fits <- readRDS(file = here::here("output",
-                                  sprintf(paste0("fits","%s",".rds"),suf)))
+                                  sprintf("fits_%s_%s.rds",measure, wave)))
 samples <- readRDS(file = here::here("output",
-                                     sprintf(paste0("fits","%s",".rds"),suf)))
+                                     sprintf("samples_%s_%s.rds",measure, wave)))
+
+outputdir <- "deaths"
 
 # ---------------------------------------------------------------------------- #
 # MODEL COMPARISON TABLE
@@ -68,7 +75,7 @@ model_comp %>%
 # ---------------------------------------------------------------------------- #
 # MODEL SUMMARY PLOTS
 
-pdf(here::here("figures","final_altdata","fits.pdf"), height = 8, width = 12)
+pdf(here::here("figures",outputdir,"fits.pdf"), height = 8, width = 12)
 for (m in seq_along(fits)){
   plot.model(fits[[m]])
 }
@@ -81,8 +88,8 @@ get_resid <- function(fit){
   dat %>% 
     mutate(mu = fit$summary.fitted.values$mean,
            sigma2 = mu*(1 + mu/fit$summary.hyperpar[1,"mean"]),
-           resid = (SMR-mu)/sqrt(sigma2),
-           MSqE = (SMR-mu)^2,
+           resid = (SIR-mu)/sqrt(sigma2),
+           MSqE = (SIR-mu)^2,
            logs = log(fit$cpo$cpo)) 
 }
 
@@ -92,16 +99,16 @@ resids <- lapply(fits, function(fit) get_resid(fit)$resid) %>%
 
 dat_resid <- bind_cols(dat, resids) 
 
-png(here::here("figures","final_altdata","map_resids.png"), height = 800, width = 1200, res = 150)
+png(here::here("figures",outputdir,"map_resids.png"), height = 800, width = 1200, res = 150)
 # tiff(filename = "./figures/final_altdata/map_resids.tif", height = 600, width = 1000)
 dat_resid %>%
-  pivot_longer(cols = base:BYM_geog) %>%
+  pivot_longer(cols = base:BYM_geog_nocovs) %>%
   group_by(lad19cd, name) %>%
-  summarise(value = mean(value)) %>% 
+  summarise(value = mean(value)) %>%
   left_join(regions) %>%
   basic_map(fill = "value") +
   # scale_fill_viridis_c(trans = "log10") +
-  facet_wrap(~name, ncol = 3, nrow = 2) +
+  facet_wrap(~name, ncol = 4, nrow = 2) +
   labs(title = "Mean Squared Error per local authority")
 dev.off()
 
@@ -114,17 +121,20 @@ logs <- lapply(fits, function(fit) get_resid(fit)$logs) %>%
 
 dat_logs <- bind_cols(dat, logs) 
 
-png(here::here("figures","final_altdata","map_logs.png"), height = 800, width = 1200, res = 150)
+png(here::here("figures",outputdir,"map_logs.png"), height = 800, width = 1200, res = 150)
 # tiff(filename = "./figures/final_altdata/map_resids.tif", height = 600, width = 1000)
 dat_logs %>%
-  pivot_longer(cols = base:BYM_geog) %>%
+  pivot_longer(cols = base:BYM_geog_nocovs) %>%
   group_by(lad19cd, name) %>%
-  summarise(value = -mean(value)) %>% 
+  summarise(value = -mean(value)) %>%
+  group_by(name) %>%
+  mutate(name = paste0(name," (",round(mean(value),2),")")) %>%
   left_join(regions) %>%
   basic_map(fill = "value") +
   # scale_fill_viridis_c(trans = "log10") +
-  facet_wrap(~name, ncol = 3, nrow = 2) +
-  labs(title = "Log score of prediction per local authority")
+  facet_wrap(~name, ncol = 4, nrow = 2) +
+  labs(title = "Log score of prediction per local authority",
+       subtitle = "Mean log score over all LTLAs given in brackets")
 dev.off()
 
 # ---------------------------------------------------------------------------- #
@@ -136,13 +146,13 @@ for (s in seq_along(samples)){
   
   preds <- bind_cols(lapply(samples[[s]], get_preds))
   
-  pdf(here::here("figures","final_altdata",paste0("summ_post_", names(fits)[s],".pdf")), height = 8, width = 10)
+  pdf(here::here("figures",outputdir,paste0("summ_post_", names(fits)[s],".pdf")), height = 8, width = 10)
   
   hist(exp(as.matrix(preds))*dat$E_wk, breaks = 30, xlim = c(0,200), prob = T)
   hist(dat$n, breaks = 30, xlim = c(0,200), prob = T)
   
-  dat_pred <- bind_cols(dplyr::select(dat, geography, lad19cd, lad19nm, la, la_pop, wod, E_wk, n), preds) %>%
-    pivot_longer(cols = -1:-7) %>%
+  dat_pred <- bind_cols(dplyr::select(dat, geography, lad19cd, lad19nm, la, la_pop, week, E_wk, n), preds) %>%
+    pivot_longer(cols = -1:-8) %>%
     mutate(pred_n = exp(value)*E_wk)
   
   dat_pred %>%
@@ -162,23 +172,23 @@ for (s in seq_along(samples)){
   
   print(
     dat_pred %>%
-      group_by(wod, name) %>%
+      group_by(week, name) %>%
       summarise(pred_n = sum(pred_n),
                 n = sum(n)) %>%
       ggplot() + 
-      geom_line(aes(wod, pred_n, group = name), alpha = 0.1, col = "grey") +
-      geom_point(aes(wod, n)) + 
+      geom_line(aes(week, pred_n, group = name), alpha = 0.1, col = "grey") +
+      geom_point(aes(week, n)) + 
       theme_minimal()
   )
   
   print(
     dat_pred %>%
-      group_by(wod, name, geography) %>%
+      group_by(week, name, geography) %>%
       summarise(pred_n = sum(pred_n),
                 n = sum(n)) %>%
       ggplot() + 
-      geom_line(aes(wod, pred_n, group = name, col = geography), alpha = 0.1, col = "grey") +
-      geom_point(aes(wod, n)) + 
+      geom_line(aes(week, pred_n, group = name, col = geography), alpha = 0.1, col = "grey") +
+      geom_point(aes(week, n)) + 
       facet_wrap(~geography) +
       theme_minimal()
   )
@@ -189,8 +199,8 @@ for (s in seq_along(samples)){
     dat_pred %>%
       filter(la %in% la_samp) %>%
       ggplot() + 
-      geom_line(aes(wod, pred_n, group = name), alpha = 0.1, col = "grey") +
-      geom_point(aes(wod, n)) + 
+      geom_line(aes(week, pred_n, group = name), alpha = 0.1, col = "grey") +
+      geom_point(aes(week, n)) + 
       facet_wrap(~lad19nm) +
       theme_minimal()
   )
@@ -223,13 +233,16 @@ for (s in seq_along(samples)){
 # ---------------------------------------------------------------------------- #
 # SUMMARISE COVARIATE EFFECTS
 
+png(here::here("figures",outputdir,"covariates_final.png"), height = 800, width = 1000, res = 150)
+# tiff(filename = "./figures/final_altdata/map_resids.tif", height = 600, width = 1000)
+
 fits[["BYM_geog"]]$summary.fixed[-1,] %>% #rep_BYM
   rownames_to_column(var = "Covariate") %>%
   ggplot(aes(x = Covariate, y = mean,  ymin = `0.025quant`, ymax = `0.975quant`)) +
   geom_pointrange() +
   geom_hline(aes(yintercept = 0), lty = "dashed",col = "red") +
   labs(y = "Estimate") 
-
+dev.off()
 
 
 

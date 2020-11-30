@@ -1,6 +1,5 @@
 ################################################################################
-# Description: Summarise and visualise death time series per LTLA. Produce 
-# descriptive figures for paper.
+# Description: Run models
 # 
 # Author: Emily S Nightingale
 # Date created: 30/09/2020
@@ -19,7 +18,10 @@ library(spdep)
 library(sf)
 library(here)
 
-source(here::here("code","functions.R"))
+measure <- "deaths"
+wave <- 1
+
+source(here::here("code","main","functions.R"))
 
 datadir <- "C:/Users/phpuenig/Documents/COVID-19/Data/"
 
@@ -33,7 +35,14 @@ regions.df <- st_drop_geometry(regions)
 g <- inla.read.graph(filename = paste0(datadir,"maps/regions_eng.adj"))
 
 # LTLA-week-aggregated observed deaths, expected deaths and LTLA covariates
-dat <- readRDS(paste0(datadir, "Deaths/dat_deaths_2020-01-01_2020-06-30.rds"))
+# (first and second waves)
+dat_all <- readRDS(here::here("data",paste0(measure,".rds")))
+
+dat <- dat_all[[wave]]
+period <- dat_all$breaks[[wave]]
+
+# dat <- readRDS(paste0(datadir, "Deaths/dat_deaths_2020-01-01_2020-06-30.rds"))
+
 
 ################################################################################
 # PRIOR SPECIFICATION
@@ -43,8 +52,8 @@ dat <- readRDS(paste0(datadir, "Deaths/dat_deaths_2020-01-01_2020-06-30.rds"))
 sqrt(var(dat$n))
 mean(dat$n)
 
-# Overall SD in SMR
-sqrt(var(dat$SMR))
+# Overall SD in SIR
+sqrt(var(dat$SIR))
 
 # SD over time
 dat %>%
@@ -87,7 +96,7 @@ plot(inla.pc.dprec(seq(0,100,0.01),u = sd_space/0.31, alpha = 0.01))
 
 ## Base model: No spatial effects, two temporal RWs, independent of geography
 f_base <- n ~ 
-   IMD + prop_minority + log(pop_dens) + 
+   IMD + prop_minority + #log(pop_dens) + 
    #tb_inc + #cv_mort + can_mort +
   f(w, model = "rw1",
     hyper = list(prec = prior.prec.tp),
@@ -100,7 +109,7 @@ f_base <- n ~
 
 ## No spatial effect, geography-dependent RW
 f_base_geog <- n ~ 
-   IMD + prop_minority + log(pop_dens) + 
+   IMD + prop_minority + #log(pop_dens) + 
   f(w, model = "rw1",
     hyper = list(prec = prior.prec.tp),
     values = seq(min(dat$w),max(dat$w)), 
@@ -114,7 +123,7 @@ f_base_geog <- n ~
 
 ## IID spatial
 f_iid <- n ~ 
-   IMD + prop_minority + log(pop_dens) +
+   IMD + prop_minority + # log(pop_dens) +
    #prop_kw +
    #tb_inc + #cv_mort + can_mort +
   f(w, model = "rw1",
@@ -133,7 +142,7 @@ f_iid <- n ~
 
 ## IID spatial with geography-dependent RW
 f_iid_geog <- n ~ 
-   IMD + prop_minority + log(pop_dens) + 
+   IMD + prop_minority + #log(pop_dens) + 
   f(w, model = "rw1",
     hyper = list(prec = prior.prec.tp),
     values = seq(min(dat$w),max(dat$w)), 
@@ -151,7 +160,7 @@ f_iid_geog <- n ~
 
 ## BYM spatial
 f_bym <- n ~ 
-   IMD + prop_minority + log(pop_dens) +
+   IMD + prop_minority + #log(pop_dens) +
   f(w, model = "rw1",
     hyper = list(prec = prior.prec.tp),
     values = seq(min(dat$w),max(dat$w)),
@@ -170,7 +179,7 @@ f_bym <- n ~
 
 ## BYM spatial effect, geography-dependent RW
 f_bym_geog <- n ~ 
-   IMD + prop_minority + log(pop_dens) + 
+   IMD + prop_minority + #log(pop_dens) + 
   f(w, model = "rw1",
     hyper = list(prec = prior.prec.tp),
     values = seq(min(dat$w),max(dat$w)),   
@@ -212,9 +221,9 @@ f_bym_geog_nocovs <- n ~
 formulae <- list(base = f_base, base_geog = f_base_geog, iid = f_iid, iid_geog = f_iid_geog, BYM = f_bym, BYM_geog = f_bym_geog, BYM_geog_nocovs = f_bym_geog_nocovs)
 fits <- lapply(formulae, fit_mod, dat)
 
-saveRDS(fits, file = "output/fits_final_1stwave.rds")
+saveRDS(fits, file = here::here("output",sprintf("fits_%s_%s.rds",measure, wave)))
 
-## Draw posterior samples ##
+# ## Draw posterior samples ##
 samples <- lapply(fits, inla.posterior.sample,n = 1000)
-saveRDS(samples, file = "output/samples_final_1stwave.rds")
+saveRDS(samples, file =  here::here("output",sprintf("samples_%s_%s.rds",measure, wave)))
 
