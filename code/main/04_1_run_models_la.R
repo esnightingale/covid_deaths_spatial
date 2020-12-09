@@ -19,7 +19,7 @@ library(sf)
 library(here)
 
 measure <- "deaths"
-wave <- 1
+wave <- 2
 
 source(here::here("code","main","functions.R"))
 
@@ -52,23 +52,28 @@ period <- dat_all$breaks[[wave]]
 sqrt(var(dat$n))
 mean(dat$n)
 
+# Overall SD in SIR
+sqrt(var(dat$SIR))
+
 # SD over time
-  dat %>%
-    group_by(w) %>%
-    summarise(n = sum(n), E = sum(E_wk)) %>%
-    mutate(rate = n/E) %>%
-    pull(rate) %>%
-    var() %>%
-    sqrt() -> sd_time
-  
-  # SD over space
-  dat %>%
-    group_by(lad19cd) %>%
-    summarise(n = sum(n), E = unique(E_wk)) %>%
-    mutate(rate = n/E) %>%
-    pull(rate) %>%
-    var() %>%
-    sqrt() -> sd_space
+dat %>%
+  group_by(w) %>%
+  summarise(n = sum(n), E = sum(E_wk)) %>%
+  mutate(SIR = n/E) %>%
+  pull(SIR) %>%
+  var() %>%
+  sqrt() -> sd_time
+sd_time
+
+# SD over space
+dat %>%
+  group_by(lad19cd) %>%
+  summarise(n = sum(n), E = unique(E)) %>%
+  mutate(SIR = n/E) %>%
+  pull(SIR) %>%
+  var() %>%
+  sqrt() -> sd_space
+sd_space
 
 # => Less variation over space than over time
 
@@ -89,79 +94,68 @@ plot(inla.pc.dprec(seq(0,100,0.01),u = sd_space/0.31, alpha = 0.01))
 ################################################################################
 
 
-## Base model: No spatial effects, two temporal RWs, independent of geography
+## Base model: No spatial effects, temporal RW, independent of geography
 f_base <- n ~ 
-    IMD + prop_minority + #log(pop_dens) + 
+   IMD + prop_minority + #log(pop_dens) + 
    #tb_inc + #cv_mort + can_mort +
-  f(w, model = "rw1",
+  f(w, model = "rw2",
     hyper = list(prec = prior.prec.tp),
     values = seq(min(dat$w),max(dat$w)),
-    scale.model = T) +
-  f(wk_since_first, model = "rw2",
-    values = seq(min(dat$wk_since_first),max(dat$wk_since_first)),
-    hyper = list(prec = prior.prec.tp),
-    scale.model = T)
+    scale.model = T) 
+  # f(wk_since_first, model = "rw2",
+  #   values = seq(min(dat$wk_since_first),max(dat$wk_since_first)),
+  #   hyper = list(prec = prior.prec.tp),
+  #   scale.model = T)
 
 ## No spatial effect, geography-dependent RW
-f_base_geog <- n ~ 
-  IMD + prop_minority + #log(pop_dens) + 
-  f(w, model = "rw1",
+f_base_la <- n ~ 
+   IMD + prop_minority + #log(pop_dens) + 
+  # f(w, model = "rw1",
+  #   hyper = list(prec = prior.prec.tp),
+  #   values = seq(min(dat$w),max(dat$w)), 
+  #   scale.model = T) +
+  f(w, model = "rw2",
     hyper = list(prec = prior.prec.tp),
-    values = seq(min(dat$w),max(dat$w)), 
-    scale.model = T) +
-  f(wk_since_first, model = "rw2",
-    hyper = list(prec = prior.prec.tp),
-    replicate = geog,
-    values = seq(min(dat$wk_since_first),max(dat$wk_since_first)),
+    replicate = la,
+    values = seq(min(dat$w),max(dat$w)),
     scale.model = T) 
 
 
 ## IID spatial
 f_iid <- n ~ 
-  IMD + prop_minority + #log(pop_dens) + 
+   IMD + prop_minority + # log(pop_dens) +
    #prop_kw +
    #tb_inc + #cv_mort + can_mort +
-  f(w, model = "rw1",
+  f(w, model = "rw2",
     hyper = list(prec = prior.prec.tp),
     values = seq(min(dat$w),max(dat$w)),
     scale.model = T) +
-  f(wk_since_first, model = "rw2",
-    values = seq(min(dat$wk_since_first),max(dat$wk_since_first)),
-    hyper = list(prec = prior.prec.tp),
-    scale.model = T) +
+  # f(wk_since_first, model = "rw2",
+  #   values = seq(min(dat$wk_since_first),max(dat$wk_since_first)),
+  #   hyper = list(prec = prior.prec.tp),
+  #   scale.model = T) +
  f(la, model = "iid", 
     constr = T,
     hyper=list(
       prec = prior.prec.sp
     ))
 
-## IID spatial with geography-dependent RW
-f_iid_geog <- n ~ 
-  IMD + prop_minority + #log(pop_dens) + 
-  f(w, model = "rw1",
-    hyper = list(prec = prior.prec.tp),
-    values = seq(min(dat$w),max(dat$w)), 
-    scale.model = T) +
-  f(wk_since_first, model = "rw2",
-    hyper = list(prec = prior.prec.tp),
-    replicate = geog,
-    values = seq(min(dat$wk_since_first),max(dat$wk_since_first)),
-    scale.model = T) +
+## IID spatial with sp-tp interaction
+f_iid_int <- n ~ 
+   IMD + prop_minority + #log(pop_dens) + 
  f(la, model = "iid", 
     constr = T,
+   group = w,
+   control.group = list(model = "rw2", values = seq(min(dat$w),max(dat$w))),
     hyper=list(
       prec = prior.prec.sp
     ))
 
 ## BYM spatial
 f_bym <- n ~ 
-  IMD + prop_minority + #log(pop_dens) + 
-  f(w, model = "rw1",
-    hyper = list(prec = prior.prec.tp),
+   IMD + prop_minority + #log(pop_dens) +
+  f(w, model = "rw2",
     values = seq(min(dat$w),max(dat$w)),
-    scale.model = T) +
-  f(wk_since_first, model = "rw2",
-    values = seq(min(dat$wk_since_first),max(dat$wk_since_first)),
     hyper = list(prec = prior.prec.tp),
     scale.model = T) +
  f(la, model = "bym2", graph = g,
@@ -172,52 +166,65 @@ f_bym <- n ~
       prec = prior.prec.sp) 
     )
 
-## BYM spatial effect, geography-dependent RW
-f_bym_geog <- n ~ 
-  IMD + prop_minority + #log(pop_dens) + 
-  f(w, model = "rw1",
-    hyper = list(prec = prior.prec.tp),
-    values = seq(min(dat$w),max(dat$w)),
-    scale.model = T) +
-  f(wk_since_first, model = "rw2",
-    values = seq(min(dat$wk_since_first),max(dat$wk_since_first)),
-    hyper = list(prec = prior.prec.tp),
-    scale.model = T) +
+## BYM spatial effect, sptp interaction
+f_bym_int <- n ~ 
+   IMD + prop_minority + #log(pop_dens) + 
  f(la, model = "bym2", graph = g,
     scale.model = T,
     constr = T,
+    group = w,
+    control.group = list(model = "rw2", values = seq(min(dat$w),max(dat$w))),
     hyper=list(
       phi =list(param =c(0.5, 2/3)),
       prec = prior.prec.sp) 
     )
 
 ## BYM spatial effect, geography-dependent RW, no covariates
-f_bym_geog_nocovs <- n ~
-  f(w, model = "rw1",
-    hyper = list(prec = prior.prec.tp),
-    values = seq(min(dat$w),max(dat$w)),
-    scale.model = T) +
-  f(wk_since_first, model = "rw2",
-    hyper = list(prec = prior.prec.tp),
-    replicate = geog,
-    values = seq(min(dat$wk_since_first),max(dat$wk_since_first)),
-    scale.model = T) +
-  f(la, model = "bym2", graph = g,
-    scale.model = T,
-    constr = T,
-    hyper=list(
-      phi =list(param =c(0.5, 2/3)),
-      prec = prior.prec.sp)
-  )
-
+# f_bym_geog_nocovs <- n ~
+#   f(w, model = "rw1",
+#     hyper = list(prec = prior.prec.tp),
+#     values = seq(min(dat$w),max(dat$w)),   
+#     scale.model = T) +
+#   f(wk_since_first, model = "rw2",
+#     hyper = list(prec = prior.prec.tp),
+#     replicate = geog,
+#     values = seq(min(dat$wk_since_first),max(dat$wk_since_first)),
+#     scale.model = T) +
+#   f(la, model = "bym2", graph = g,
+#     scale.model = T,
+#     constr = T,
+#     hyper=list(
+#       phi =list(param =c(0.5, 2/3)),
+#       prec = prior.prec.sp) 
+#   )
 
 ## Fit all models ##
-formulae <- list(base = f_base, base_geog = f_base_geog, iid = f_iid, iid_geog = f_iid_geog, BYM = f_bym, BYM_geog = f_bym_geog, BYM_geog_nocovs = f_bym_geog_nocovs) 
-fits <- lapply(formulae, fit_mod, dat, E = E_wk)
+formulae <- list(base = f_base, base_la = f_base_la, iid = f_iid, iid_int = f_iid_int, BYM = f_bym, BYM_int = f_bym_int)
+fits <- lapply(formulae, fit_mod, dat)
 
-saveRDS(fits, file = here::here("output",sprintf("fits_%s_%s.rds",measure, wave)))
+saveRDS(fits, file = here::here("output",sprintf("fits_%s_%s_altmods.rds",measure, wave)))
 
 # ## Draw posterior samples ##
 samples <- lapply(fits, inla.posterior.sample,n = 1000)
-saveRDS(samples, file =  here::here("output",sprintf("samples_%s_%s.rds",measure, wave)))
+saveRDS(samples, file =  here::here("output",sprintf("samples_%s_%s_altmods.rds",measure, wave)))
 
+
+
+# Fit interaction model
+
+
+f_temp_by_la <- n ~ 
+  # IMD + prop_minority + #log(pop_dens) + 
+  f(w, model = "rw2",
+    hyper = list(prec = prior.prec.tp),
+    values = seq(min(dat$w),max(dat$w)),
+    scale.model = T,
+    group = la, 
+    control.group = list(model = "besag", 
+                         graph = g, 
+                         hyper=list(prec = prior.prec.sp),
+                         scale.model = T)) 
+
+fit_temp_by_la <- fit_mod(f_temp_by_la, dat_c)
+saveRDS(fit_temp_by_la, here::here("output","fit_cases_1_temp_by_la.rds"))
+saveRDS(samples_temp_by_la, here::here("output","samples_cases_1_temp_by_la.rds"))

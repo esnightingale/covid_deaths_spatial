@@ -25,7 +25,7 @@ basic_map <- function(sf, fill, rate1e5 = F){
   
   p <- ggplot(sf, aes(geometry = geometry, fill = fill)) +
     geom_sf(colour = NA) +
-    scale_fill_viridis_c() +
+    scale_fill_viridis_c(na.value = "grey") +
     labs(fill = "") +
     annotation_scale(location = "br") +
     map_theme() 
@@ -83,11 +83,11 @@ map_wlondon <- function(sf, fill, rate1e5 = F){
 
 
 ## INLA MODEL SPECIFICATION ##
-fit_mod <- function(f, dat){
+fit_mod <- function(f, dat, E){
   fit <- inla(f,
               "nbinomial",
               data= dat,
-              E = E_wk,
+              E = E,
               # offset = log(la_age_pop),
               control.compute=list(dic=TRUE, 
                                    waic=TRUE, 
@@ -98,9 +98,6 @@ fit_mod <- function(f, dat){
   return(fit)
 }
 
-get_preds <- function(sample){
-  pred <- sample$latent[1:nval]
-}
 
 
 ## PIT HISTOGRAM ##
@@ -115,6 +112,10 @@ pit_hist <- function(fit, bins = 30){
   )
 }
 
+
+get_preds <- function(sample){
+  pred <- sample$latent[1:nrow(dat)]
+}
 
 ## PLOT MODEL SUMMARY ##
 plot.model <- function(m){

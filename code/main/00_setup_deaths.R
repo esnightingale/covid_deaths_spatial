@@ -23,6 +23,8 @@ covid_deaths <- filter(covid_deaths_raw, grepl("e",ltla_code)) %>% # filter to E
                         stringr::str_to_title(gsub("_"," ",ltla_name)))),
          lad19nm = ltla_name) 
 
+covid_deaths$date_swab[lubridate::ymd(covid_deaths$date_swab) < "2020-01-01"] <- NA
+
 # saveRDS(covid_deaths_raw,paste0(death_dir,"covid_deaths_raw.rds"))
 # saveRDS(covid_deaths_E,paste0(death_dir,"covid_deaths_E.rds"))
 
@@ -38,16 +40,17 @@ covid_deaths$lad19nm[covid_deaths$lad19cd == "E09000033"] <- "Westminster"
 covid_deaths %>%
   rename(date = date_death,
          date_report = ons_date_report) %>%
-  mutate_at(vars(date, date_report), lubridate::ymd) %>%
+  mutate_at(vars(date_swab, date, date_report), lubridate::ymd) %>%
   filter(!is.na(age) & !is.na(date)) %>% 
-  mutate(report_delay = as.integer(difftime(date_report, date, units = "days")),
+  mutate(swab_death = as.integer(difftime(date, date_swab, units = "days")),
+         report_delay = as.integer(difftime(date_report, date, units = "days")),
          week = lubridate::floor_date(date, unit = "week"),
          age_group = as.character(cut(age, breaks = c(0,seq(10,90,10),120), right = FALSE))) %>%
   group_by(lad19cd) %>%
   mutate(ltla_first = min(date, na.rm = T)) %>%
   ungroup() %>%
   arrange(age) %>%
-  dplyr::select(lad19cd, ltla_name, ltla_first, week, date, date_report, report_delay, age_group) -> alldata
+  dplyr::select(lad19cd, ltla_name, ltla_first, week, date, date_report, date_swab, swab_death, report_delay, age_group) -> alldata
 
 alldata$age_group[alldata$age_group == "[90,120)"] <- "[90,NA)"
 alldata$age_group <- as.factor(alldata$age_group)

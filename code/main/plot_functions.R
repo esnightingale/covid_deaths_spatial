@@ -96,6 +96,62 @@ plot_la_tot <- function(data, wave = 1, title){
   
 }
 
+plot_la_mth <- function(data, title){
+  
+  data <- data %>%
+    mutate(month = droplevels(month))
+  
+  combs <- data %>%
+    tidyr::expand(lad19cd, month)
+  agg <- data %>%
+    group_by(lad19cd, month) %>%
+    tally() %>%
+    right_join(combs) 
+  
+  regions %>% 
+    full_join(agg) %>%
+    basic_map(fill = "n", rate1e5 = TRUE) +
+    labs(title = title) + 
+    map_theme() +
+    facet_wrap(~month) -> map_mth
+  
+  return(map_mth)
+  
+}
+
+plot_la_mth_animate <- function(data, title, file, path){
+
+  data <- data %>%
+    mutate(month = droplevels(month))
+  
+  combs <- data %>%
+    tidyr::expand(lad19cd, month)
+  agg <- data %>%
+    group_by(lad19cd, month) %>%
+    tally() %>%
+    right_join(combs) 
+  
+  regions %>%
+    full_join(agg) %>%
+    # mutate(n = replace_na(n, 0)) %>%
+    basic_map(fill = "n", rate1e5 = TRUE) +
+    map_theme() +
+    labs(title = title, 
+         subtitle = '{current_frame}') +
+    transition_manual(month) -> map_anim
+  
+  anim_save(
+    file = file, 
+    animate(
+      map_anim,
+      renderer = gifski_renderer(),
+      height = 800, width = 800, res = 150
+    ),
+    path = path)
+  
+  
+}
+
 plot_epi_time <- function(data, wave = 1, measure){
   
   period <- data$breaks[[wave]]
