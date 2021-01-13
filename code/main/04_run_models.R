@@ -181,6 +181,7 @@ f_bym_geog <- n ~
     scale.model = T) +
   f(wk_since_first, model = "rw2",
     values = seq(min(dat$wk_since_first),max(dat$wk_since_first)),
+    replicate = geog,
     hyper = list(prec = prior.prec.tp),
     scale.model = T) +
  f(la, model = "bym2", graph = g,
@@ -220,4 +221,3 @@ saveRDS(fits, file = here::here("output",sprintf("fits_%s_%s.rds",measure, wave)
 # ## Draw posterior samples ##
 samples <- lapply(fits, inla.posterior.sample,n = 1000)
 saveRDS(samples, file =  here::here("output",sprintf("samples_%s_%s.rds",measure, wave)))
-
