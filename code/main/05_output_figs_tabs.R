@@ -56,7 +56,6 @@ fits <- readRDS(file = here::here("output",
 samples <- readRDS(file = here::here("output",
                                      sprintf("samples_%s_%s.rds",measure, wave)))
 
-
 # ---------------------------------------------------------------------------- #
 # MODEL COMPARISON TABLE
 
@@ -124,13 +123,13 @@ logs <- lapply(fits, function(fit) get_resid(fit)$logs) %>%
 
 dat_logs <- bind_cols(dat, logs) 
 
-png(here::here("figures",measure,"map_logs.png"), height = 1000, width = 1400, res = 150)
+png(here::here("figures",measure,"map_logs.png"), height = 1000, width = 1600, res = 150)
 dat_logs %>%
   # dplyr::select(-BYM_geog_nocovs) %>%
   # pivot_longer(cols = base:BYM_geog) %>%
   pivot_longer(cols = base:BYM_geog_nocovs) %>% 
   group_by(lad19cd, name) %>%
-  summarise(value = -sum(value)) %>%
+  summarise(value = -mean(value)) %>%
   # mutate(name = factor(name, levels = c("base","base_geog","iid","iid_geog", "BYM","BYM_geog"), labels = c("Temporal only (A)", "Geography-specific temporal (B)","A + IID spatial", "B + IID spatial","A + BYM spatial","B + BYM spatial"))) %>% 
   mutate(name = factor(name, levels = c("base","base_geog","iid","iid_geog", "BYM","BYM_geog","BYM_geog_nocovs"), labels = c("Temporal only (A)", "Geography-specific temporal (B)","A + IID spatial", "B + IID spatial","A + BYM spatial","B + BYM spatial","B + BYM spatial - covs"))) %>%
   group_by(name) %>%
@@ -154,6 +153,7 @@ for (s in seq_along(samples)){
   
   pdf(here::here("figures",measure,paste0("summ_post_", names(fits)[s],".pdf")), height = 8, width = 10)
   
+  # par(mfrow = c(2,1))
   # hist(exp(as.matrix(preds))*dat$E_wk, breaks = 30, xlim = c(0,200), prob = T)
   # hist(dat$n, breaks = 30, xlim = c(0,200), prob = T)
   
@@ -161,6 +161,7 @@ for (s in seq_along(samples)){
     pivot_longer(cols = -1:-8) %>%
     mutate(pred_n = exp(value)*E_wk)
   
+  print(
   dat_pred %>%
     group_by(lad19cd, name) %>%
     # sum over weeks
@@ -175,12 +176,13 @@ for (s in seq_along(samples)){
     basic_map(fill = "value", rate1e5 = TRUE) +
     facet_wrap(~name) +
     labs(title = "Predicted deaths per 100,000: Quantiles of 1000 posterior samples per local authority")
+  )
   
   print(
     dat_pred %>%
       group_by(week, name) %>%
-      summarise(pred_n = sum(pred_n),
-                n = sum(n)) %>%
+      summarise(pred_n = sum(pred_n, na.rm = T),
+                n = sum(n, na.rm = T)) %>%
       ggplot() + 
       geom_line(aes(week, pred_n, group = name), alpha = 0.1, col = "grey") +
       geom_point(aes(week, n)) + 

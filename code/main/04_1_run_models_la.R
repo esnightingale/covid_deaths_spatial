@@ -19,7 +19,7 @@ library(sf)
 library(here)
 
 measure <- "deaths"
-wave <- 2
+wave <- 1
 
 source(here::here("code","main","functions.R"))
 
@@ -157,6 +157,9 @@ f_bym <- n ~
   f(w, model = "rw2",
     values = seq(min(dat$w),max(dat$w)),
     hyper = list(prec = prior.prec.tp),
+          replicate = geog,
+          values = seq(min(dat$wk_since_first),max(dat$wk_since_first)),
+          scale.model = T) +
     scale.model = T) +
  f(la, model = "bym2", graph = g,
     scale.model = T,
