@@ -110,7 +110,7 @@ dat_resid %>%
   basic_map(fill = "value") +
   scale_fill_gradient2(midpoint = 0)+
   # scale_fill_viridis_c(trans = "log2") +
-  facet_wrap(~name) +
+  facet_wrap(~name, ncol = 4) +
   labs(title = "Average pearson residual per local authority")
 dev.off()
 
@@ -137,7 +137,7 @@ dat_logs %>%
   left_join(regions) %>%
   basic_map(fill = "value") +
   # scale_fill_viridis_c(trans = "log2") +
-  facet_wrap(~name2) +
+  facet_wrap(~name2, ncol = 4) +
   labs(title = "Average log score of prediction per local authority",
        subtitle = "Mean score over all LTLAs given in brackets")
 dev.off()
@@ -161,7 +161,8 @@ for (s in seq_along(samples)){
     pivot_longer(cols = -1:-8) %>%
     mutate(pred_n = exp(value)*E_wk)
   
-  print(
+  # png(here::here("figures",measure,"map_pred_quants.png"), height = 1000, width = 1600, res = 150)
+    print(
   dat_pred %>%
     group_by(lad19cd, name) %>%
     # sum over weeks
@@ -169,15 +170,16 @@ for (s in seq_along(samples)){
     # average over samples
     group_by(lad19cd) %>%
     summarise(q50 = median(value),
-              q25 = quantile(value, 0.25),
-              q75 = quantile(value, 0.75)) %>% 
+              q01 = quantile(value, 0.01),
+              q99 = quantile(value, 0.99)) %>% 
     pivot_longer(cols = contains("q")) %>% 
     left_join(regions) %>%
     basic_map(fill = "value", rate1e5 = TRUE) +
     facet_wrap(~name) +
     labs(title = "Predicted deaths per 100,000: Quantiles of 1000 posterior samples per local authority")
   )
-  
+# dev.off()
+
   print(
     dat_pred %>%
       group_by(week, name) %>%
@@ -201,20 +203,25 @@ for (s in seq_along(samples)){
       theme_minimal()
   )
   
-  # la_samp <- sample(dat$la,9)
-  # la_list <- c("Liverpool", "Bromley","Bedford", "Allerdale","Wigan","Epping Forest")
-  la_list <- c("Leeds", "Bradford")
-  la_samp <- unique(dat$la[dat$lad19nm %in% la_list | dat$geography == "London Borough"])
+  plot_la_samp <- function(data, la_samp){
   print(
-    dat_pred %>%
-      filter(la %in% la_samp) %>%
-      ggplot() + 
+    data %>%
+      dplyr::filter(la %in% la_samp) %>%
+      ggplot() +
       geom_line(aes(week, pred_n, group = name), alpha = 0.1, col = "grey") +
-      geom_point(aes(week, n)) + 
+      geom_point(aes(week, n)) +
       facet_wrap(~lad19nm) +
       theme_minimal()
   )
-  
+  }
+
+  la_samp_list <- list(random = sample(dat$la,9),
+                       range_rates = unique(dat$la[dat$lad19nm %in% c("Liverpool", "Bromley","Bedford", "Allerdale","Wigan","Epping Forest")]),
+                       positive_lag = unique(dat$la[dat$lad19nm %in% c("Leeds", "Bradford") | dat$geography == "London Borough"]))
+
+  for (l in seq_along(la_samp_list)){
+    plot_la_samp(dat_pred, la_samp_list[[l]])
+  }
   
   plot_parm <- function(parm, opt = 1){
     

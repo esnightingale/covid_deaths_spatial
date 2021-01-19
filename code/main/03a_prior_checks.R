@@ -19,9 +19,12 @@ library(sf)
 library(here)
 
 measure <- "deaths"
+expected <- "E"
 wave <- 1
 
-source(here::here("code","main","functions.R"))
+# For case models, exclude covariates and use raw LA pop as offset rather than age adjusted.
+
+list.files(here::here("code","utils"), full.names = TRUE) %>% walk(source)
 
 datadir <- "C:/Users/phpuenig/Documents/COVID-19/Data/"
 
@@ -40,8 +43,6 @@ dat_all <- readRDS(here::here("data",paste0(measure,".rds")))
 
 dat <- dat_all[[wave]]
 period <- dat_all$breaks[[wave]]
-
-# dat <- readRDS(paste0(datadir, "Deaths/dat_deaths_2020-01-01_2020-06-30.rds"))
 
 
 ################################################################################
@@ -78,11 +79,12 @@ prior.prec.tp <- list(prec = list(prior = "pc.prec",
 prior.prec.sp <- list(prec = list(prior = "pc.prec",
                                param = c(sd_space/0.31, 0.01)))
 
-# Plot priors
-plot(inla.pc.dprec(seq(0,100,0.01),u = sd_time/0.31, alpha = 0.01))
-plot(inla.pc.dprec(seq(0,100,0.01),u = sd_space/0.31, alpha = 0.01))
+# Sample and plot priors on SD scale
+prior.samp.tp <- inla.pc.rprec(1000,u = sd_time/0.31, alpha = 0.01)
+hist(1/sqrt(prior.samp.tp), breaks = 100)
 
-
+prior.samp.sp <- inla.pc.rprec(1000,u = sd_space/0.31, alpha = 0.01)
+hist(1/sqrt(prior.samp.sp), breaks = 100)
 
 ################################################################################
 # FITTING
@@ -91,7 +93,7 @@ plot(inla.pc.dprec(seq(0,100,0.01),u = sd_space/0.31, alpha = 0.01))
 
 ## Base model: No spatial effects, two temporal RWs, independent of geography
 f_base <- n ~ 
-    IMD + prop_minority + #log(pop_dens) + 
+    # IMD + prop_minority + #log(pop_dens) + 
    #tb_inc + #cv_mort + can_mort +
   f(w, model = "rw1",
     hyper = list(prec = prior.prec.tp),
@@ -104,7 +106,7 @@ f_base <- n ~
 
 ## No spatial effect, geography-dependent RW
 f_base_geog <- n ~ 
-  IMD + prop_minority + #log(pop_dens) + 
+  # IMD + prop_minority + #log(pop_dens) + 
   f(w, model = "rw1",
     hyper = list(prec = prior.prec.tp),
     values = seq(min(dat$w),max(dat$w)), 
@@ -118,7 +120,7 @@ f_base_geog <- n ~
 
 ## IID spatial
 f_iid <- n ~ 
-  IMD + prop_minority + #log(pop_dens) + 
+  # IMD + prop_minority + #log(pop_dens) + 
    #prop_kw +
    #tb_inc + #cv_mort + can_mort +
   f(w, model = "rw1",
@@ -137,7 +139,7 @@ f_iid <- n ~
 
 ## IID spatial with geography-dependent RW
 f_iid_geog <- n ~ 
-  IMD + prop_minority + #log(pop_dens) + 
+  # IMD + prop_minority + #log(pop_dens) + 
   f(w, model = "rw1",
     hyper = list(prec = prior.prec.tp),
     values = seq(min(dat$w),max(dat$w)), 
@@ -155,7 +157,7 @@ f_iid_geog <- n ~
 
 ## BYM spatial
 f_bym <- n ~ 
-  IMD + prop_minority + #log(pop_dens) + 
+  # IMD + prop_minority + #log(pop_dens) + 
   f(w, model = "rw1",
     hyper = list(prec = prior.prec.tp),
     values = seq(min(dat$w),max(dat$w)),
@@ -174,7 +176,7 @@ f_bym <- n ~
 
 ## BYM spatial effect, geography-dependent RW
 f_bym_geog <- n ~ 
-  IMD + prop_minority + #log(pop_dens) + 
+  # IMD + prop_minority + #log(pop_dens) + 
   f(w, model = "rw1",
     hyper = list(prec = prior.prec.tp),
     values = seq(min(dat$w),max(dat$w)),
@@ -192,32 +194,29 @@ f_bym_geog <- n ~
       prec = prior.prec.sp) 
     )
 
-## BYM spatial effect, geography-dependent RW, no covariates
-f_bym_geog_nocovs <- n ~
-  f(w, model = "rw1",
-    hyper = list(prec = prior.prec.tp),
-    values = seq(min(dat$w),max(dat$w)),
-    scale.model = T) +
-  f(wk_since_first, model = "rw2",
-    hyper = list(prec = prior.prec.tp),
-    replicate = geog,
-    values = seq(min(dat$wk_since_first),max(dat$wk_since_first)),
-    scale.model = T) +
-  f(la, model = "bym2", graph = g,
-    scale.model = T,
-    constr = T,
-    hyper=list(
-      phi =list(param =c(0.5, 2/3)),
-      prec = prior.prec.sp)
-  )
 
+# Set all outcome values to NA for prior predictions
+dat$n <- NA
 
-## Fit all models ##
-formulae <- list(base = f_base, base_geog = f_base_geog, iid = f_iid, iid_geog = f_iid_geog, BYM = f_bym, BYM_geog = f_bym_geog, BYM_geog_nocovs = f_bym_geog_nocovs) 
-fits <- lapply(formulae, fit_mod, dat, E = E_wk)
+## Fit all models just on prior information ##
+formulae <- list(base = f_base, base_geog = f_base_geog, iid = f_iid, iid_geog = f_iid_geog, BYM = f_bym, BYM_geog = f_bym_geog) #, BYM_geog_nocovs = f_bym_geog_nocovs 
+fits <- lapply(formulae, fit_mod, dat, expected = expected)
 
 saveRDS(fits, file = here::here("output",sprintf("fits_%s_%s.rds",measure, wave)))
 
+# Just final model
+fit <- fit_mod(f_base, dat, expected = expected)
+samples <- inla.posterior.sample(fit, n = 1000)
+plot_model(dat, fit, )
+
+plot(fit)
+
+saveRDS(fit, file = here::here("output",sprintf("fit_iid_%s_%s.rds",measure, wave)))
+
 # ## Draw posterior samples ##
-samples <- lapply(fits, inla.posterior.sample,n = 1000)
-saveRDS(samples, file =  here::here("output",sprintf("samples_%s_%s.rds",measure, wave)))
+# samples <- lapply(fits, inla.posterior.sample,n = 1000)
+# saveRDS(samples, file =  here::here("output",sprintf("samples_%s_%s.rds",measure, wave)))
+
+# Just final model
+# samples <- inla.posterior.sample(fit, n = 1000)
+# saveRDS(samples, file = here::here("output",sprintf("samples_iid_%s_%s.rds",measure, wave)))

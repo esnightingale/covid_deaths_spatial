@@ -5,12 +5,7 @@
 # 
 ################################################################################
 
-library(reportfactory)
 library(tidyverse)
-library(lubridate)
-library(linelist)
-library(cyphr)
-library(here)
 
 datadir <- "C:/Users/phpuenig/Documents/COVID-19/Data/"
 

@@ -83,11 +83,13 @@ map_wlondon <- function(sf, fill, rate1e5 = F){
 
 
 ## INLA MODEL SPECIFICATION ##
-fit_mod <- function(f, dat, E){
+fit_mod <- function(f, dat, expected = "E"){
+  
+  if (expected == "E"){
   fit <- inla(f,
               "nbinomial",
-              data= dat,
-              E = E,
+              data = dat,
+              E = E_wk,
               # offset = log(la_age_pop),
               control.compute=list(dic=TRUE, 
                                    waic=TRUE, 
@@ -95,6 +97,19 @@ fit_mod <- function(f, dat, E){
                                    config = TRUE),
               control.fixed=list(mean=0, prec=0.1, mean.intercept=0, prec.intercept=0.001),
               verbose = T)
+  }else{
+    fit <- inla(f,
+                "nbinomial",
+                data = dat,
+                # E = E_wk,
+                offset = log(la_pop),
+                control.compute=list(dic=TRUE, 
+                                     waic=TRUE, 
+                                     cpo = TRUE,
+                                     config = TRUE),
+                control.fixed=list(mean=0, prec=0.1, mean.intercept=0, prec.intercept=0.001),
+                verbose = T)
+  }
   return(fit)
 }
 
