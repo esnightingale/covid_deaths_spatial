@@ -27,8 +27,8 @@ library(ggspatial)
 library(gganimate)
 library(data.table)
 
-source(here::here("code","main","functions.R"))
-source(here::here("code","main","plot_functions.R"))
+# source(here::here("code","main","functions.R"))
+# source(here::here("code","main","plot_functions.R"))
 
 # Local data directory
 datadir <- "C:/Users/phpuenig/Documents/COVID-19/Data/"
@@ -72,6 +72,17 @@ dev.off()
 # ---------------------------------------------------------------------------- #
 
 ## COVARIATES ##
+
+# Median age
+
+png(here::here("figures","descriptive","map_age.png"), height = 800, width = 900, res = 150)
+print(
+regions %>%
+  basic_map(fill = "med_age") +
+  scale_fill_viridis_c() +
+  labs(fill = "", title = "Median age")
+)
+dev.off()
 
 cov_names <- c("pop_dens", "IMD", "prop_minority","prop_kw")
 deaths[[1]] %>%
@@ -255,6 +266,26 @@ for (dat in seq_along(data.list)){
 # (first_map + ts_geog_week ) / (peak_map + ts_geog_epiwk) + plot_annotation(tag_levels = 'A')
 # dev.off()
 
+# ---------------------------------------------------------------------------- #
+
+## Overall swab-death lag ##
+
+summary(linelist_deaths$swab_death)
+#    Min. 1st Qu.  Median    Mean 3rd Qu.    Max.    NA's 
+# -180.00    3.00    6.00    8.24   11.00  219.00   33430 
+
+summary(linelist_deaths$swab_death[linelist_deaths$swab_death >= 0 & linelist_deaths$swab_death <= 100])
+#    Min. 1st Qu.  Median    Mean 3rd Qu.    Max.    NA's 
+#    0.00    3.00    6.00    8.22   11.00  100.00   33430 
+   
+png(here::here("figures","descriptive","swab_death_lag.png"), height = 800, width = 1000, res = 150)
+linelist_deaths %>% 
+  filter(swab_death >= 0) %>%
+  ggplot(aes(x = swab_death)) + 
+  geom_histogram(bins = 40, fill = "steelblue") +
+  labs(x = "Days from swab to death", y = "Density") + 
+  xlim(c(0,100))
+dev.off()
 
 # ---------------------------------------------------------------------------- #
 
@@ -301,6 +332,8 @@ linelist_deaths %>%
   group_by(lad19cd, ltla_name, date) %>%
   tally() -> daily_deaths
 
+date_seq <- seq(from = min(daily_deaths$date), to = max(daily_deaths$date), by = "days")
+
 vars <- names(select(daily_deaths, lad19cd, ltla_name))
 daily_deaths <- as.data.table(daily_deaths)
 all_dates <- daily_deaths[,.(date=date_seq),by = vars]
@@ -328,6 +361,9 @@ daily_deaths %>%
 linelist_cases %>%
   group_by(lad19cd, lad19nm, date) %>%
   tally() -> daily_cases
+
+date_seq <- seq(from = min(daily_cases$date), to = max(daily_cases$date), by = "days")
+
 
 vars <- names(select(daily_cases, lad19cd, lad19nm))
 daily_cases <- as.data.table(daily_cases)

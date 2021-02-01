@@ -27,7 +27,7 @@ join_city <- function(d){
 }
 
 datadir <- "~/COVID-19/Data/"
-pops_raw <- readxl::read_xls(paste0(datadir,"maps/ukmidyearestimates20192020ladcodes.xls"), 
+pops_raw <- readxl::read_xls(paste0(datadir,"populations/ukmidyearestimates20192020ladcodes.xls"), 
                      sheet = "MYE2 - Persons",
                      skip = 4) 
 

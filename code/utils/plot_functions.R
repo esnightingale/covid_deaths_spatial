@@ -161,7 +161,7 @@ plot_epi_time <- function(data, wave = 1, measure){
     summarise(first = unique(first)) %>% 
     full_join(regions) %>%
     basic_map(fill = "first") +
-    scale_fill_viridis(option = "plasma") +
+    scale_fill_viridis(option = "plasma", trans = "log2") +
     labs(title = paste0("Week of first ",measure),
          subtitle = paste(period[1],"-",period[2])) + 
     map_theme()  -> first_map
