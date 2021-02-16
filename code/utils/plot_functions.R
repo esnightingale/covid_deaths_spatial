@@ -79,6 +79,34 @@ plot_geog_ts <- function(data, wave = 1, title1, title2){
   
 }
 
+
+plot_one_la <- function(laID){
+  
+  dat_pred_c %>%
+    filter(la == laID) %>%
+    ggplot() + 
+    geom_line(aes(week, pred_n, group = name), alpha = 0.1, col = "grey") +
+    geom_point(aes(week, n), col = "black") + 
+    geom_line(data = filter(dat_pred_d,la == laID), aes(week-2, pred_n, group = name), alpha = 0.1, col = "steelblue3") +
+    geom_point(data = filter(dat_pred_d,la == laID), aes(week-2, n), col = "steelblue4") +
+    theme_minimal() -> p
+  
+  print(p)
+}
+
+
+plot_la_samp <- function(data, la_samp){
+  print(
+    data %>%
+      dplyr::filter(la %in% la_samp) %>%
+      ggplot() +
+      geom_line(aes(week, pred_n, group = name), alpha = 0.1, col = "grey") +
+      geom_point(aes(week, n)) +
+      facet_wrap(~lad19nm) +
+      theme_minimal()
+  )
+}
+
 plot_la_tot <- function(data, wave = 1, title){
   
   period <- data$breaks[[wave]]
@@ -179,4 +207,18 @@ plot_epi_time <- function(data, wave = 1, measure){
   p <- first_map + peak_map
   return(p)
   
+}
+
+plot_parm <- function(parm, opt = 1){
+  
+  if (opt == 1){ d <- fit_final_d$marginals.fixed[[parm]]
+  }else{ d <- fit_final_d$marginals.hyperpar[[parm]] }
+  
+  print(
+    ggplot(data.frame(inla.smarginal(d)), aes(x, y)) +
+      geom_line() +
+      geom_vline(xintercept = 0, col = "red", lty = "dashed") +
+      labs(title = parm) +
+      theme_bw()
+  )
 }

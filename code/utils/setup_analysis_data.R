@@ -57,7 +57,8 @@ dat <- d_agg_wk %>%
   full_join(dplyr::select(regions, lad19cd, lad19nm, area_km2)) %>% 
   left_join(covs) %>% 
   rename(E = la_tot_E,
-         E_wk = la_wk_E) %>%
+         E_wk = la_wk_E,
+         E_wk_unstrat = la_unstrat_wk_E) %>%
   mutate(first = lubridate::week(lubridate::floor_date(ltla_first, unit = "week")),
          first_overall = min(first),
          date_first_overall = min(ltla_first, na.rm = T)) %>%
@@ -65,9 +66,10 @@ dat <- d_agg_wk %>%
          geog = as.numeric(as.factor(geography)),
          wk_since_first = w - first,
          wk_first_la_overall = first - first_overall,
-         pop_dens = la_pop/area_km2) %>% 
-  dplyr::select(n, E, E_wk, w, week, lad19cd, lad19nm, la_pop, geog, geography, area_km2, pop_dens,
-                first, wk_since_first, first_overall, wk_first_la_overall, IMD, prop_minority, prop_kw) %>%
+         pop_dens = la_pop/area_km2,
+         IMD_quint = cut(IMD, 5)) %>% 
+  dplyr::select(n, E, E_wk, E_wk_unstrat, w, week, lad19cd, lad19nm, la_pop, geog, geography, area_km2, pop_dens,
+                first, wk_since_first, first_overall, wk_first_la_overall, IMD, IMD_quint, prop_minority, prop_kw) %>%
   mutate(w2 = w, w3 = w, SIR = n/E) 
 
 # add numeric indices for each LTLA

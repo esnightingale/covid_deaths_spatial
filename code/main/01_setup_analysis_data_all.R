@@ -14,6 +14,11 @@ datadir <- "C:/Users/phpuenig/Documents/COVID-19/Data/"
 ## LTLA covariates
 covs <- readRDS(paste0(datadir,"covs.rds"))
 
+## Shapefiles
+regions <- readRDS(paste0(datadir,"maps/LA_shp_wpops.rds")) %>%
+  filter(grepl("E", lad19cd))
+regions.df <- st_drop_geometry(regions)
+
 list.files(here::here("code","utils"), full.names = TRUE) %>% walk(source)
 
 # source(here::here("code","main","01_calculate_E.R"))
@@ -55,12 +60,12 @@ saveRDS(cases, here::here("data","cases.rds"))
 
 first <- full_join(deaths[[1]], cases[[1]], 
                    by = c("w","week","la","lad19cd","lad19nm", "la_pop","geog","geography",
-                          "area_km2","pop_dens","IMD","prop_minority","prop_kw","w2","w3"),
+                          "area_km2","pop_dens","IMD","IMD_quint","prop_minority","prop_kw","w2","w3"),
                    suffix = c("_d","_c"))
 
 second <- full_join(deaths[[2]], cases[[2]], 
                    by = c("w","week","la","lad19cd","lad19nm", "la_pop","geog","geography",
-                          "area_km2","pop_dens","IMD","prop_minority","prop_kw","w2","w3"),
+                          "area_km2","pop_dens","IMD","IMD_quint","prop_minority","prop_kw","w2","w3"),
                    suffix = c("_d","_c"))
 
 merged <- list(first = first, second = second, breaks = waves)

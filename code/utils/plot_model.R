@@ -60,4 +60,4 @@ plot.model <- function(dat, fit, samples, type = "time", la_samp = NULL){
 
 }
 
-plot.model(dat, fit, samples, type = "time")
+# plot.model(dat, fit, samples, type = "time")

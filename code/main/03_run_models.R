@@ -18,9 +18,9 @@ library(spdep)
 library(sf)
 library(here)
 
-measure <- "cases"
-expected <- "pop"
-wave <- 1
+measure <- "deaths"
+expected <- "E"
+wave <- 2
 
 # For case models, exclude covariates and use raw LA pop as offset rather than age adjusted.
 
@@ -46,6 +46,8 @@ period <- dat_all$breaks[[wave]]
 
 # dat <- readRDS(paste0(datadir, "Deaths/dat_deaths_2020-01-01_2020-06-30.rds"))
 
+# Non-age-stratified expected cases
+# dat$E_wk <- dat$E_wk_unstrat
 
 ################################################################################
 # PRIOR SPECIFICATION
@@ -95,7 +97,7 @@ hist(1/sqrt(prior.samp.sp), breaks = 100)
 
 ## Base model: No spatial effects, two temporal RWs, independent of geography
 f_base <- n ~ 
-    # IMD + prop_minority + #log(pop_dens) + 
+   IMD_quint + prop_minority + #log(pop_dens) +
    #tb_inc + #cv_mort + can_mort +
   f(w, model = "rw1",
     hyper = list(prec = prior.prec.tp),
@@ -108,7 +110,7 @@ f_base <- n ~
 
 ## No spatial effect, geography-dependent RW
 f_base_geog <- n ~ 
-  # IMD + prop_minority + #log(pop_dens) + 
+  IMD_quint + prop_minority + #log(pop_dens) +
   f(w, model = "rw1",
     hyper = list(prec = prior.prec.tp),
     values = seq(min(dat$w),max(dat$w)), 
@@ -122,7 +124,7 @@ f_base_geog <- n ~
 
 ## IID spatial
 f_iid <- n ~ 
-  # IMD + prop_minority + #log(pop_dens) + 
+  IMD_quint + prop_minority + #log(pop_dens) +
    #prop_kw +
    #tb_inc + #cv_mort + can_mort +
   f(w, model = "rw1",
@@ -141,7 +143,7 @@ f_iid <- n ~
 
 ## IID spatial with geography-dependent RW
 f_iid_geog <- n ~ 
-  # IMD + prop_minority + #log(pop_dens) + 
+  IMD_quint + prop_minority + #log(pop_dens) +
   f(w, model = "rw1",
     hyper = list(prec = prior.prec.tp),
     values = seq(min(dat$w),max(dat$w)), 
@@ -159,7 +161,7 @@ f_iid_geog <- n ~
 
 ## BYM spatial
 f_bym <- n ~ 
-  # IMD + prop_minority + #log(pop_dens) + 
+  IMD_quint + prop_minority + #log(pop_dens) +
   f(w, model = "rw1",
     hyper = list(prec = prior.prec.tp),
     values = seq(min(dat$w),max(dat$w)),
@@ -178,23 +180,42 @@ f_bym <- n ~
 
 ## BYM spatial effect, geography-dependent RW
 f_bym_geog <- n ~ 
-  # IMD + prop_minority + #log(pop_dens) + 
+  IMD_quint + prop_minority + #log(pop_dens) +
   f(w, model = "rw1",
     hyper = list(prec = prior.prec.tp),
     values = seq(min(dat$w),max(dat$w)),
     scale.model = T) +
   f(wk_since_first, model = "rw2",
     values = seq(min(dat$wk_since_first),max(dat$wk_since_first)),
-    replicate = geog,
     hyper = list(prec = prior.prec.tp),
+    replicate = geog,
     scale.model = T) +
- f(la, model = "bym2", graph = g,
+  f(la, model = "bym2", graph = g,
     scale.model = T,
     constr = T,
     hyper=list(
-      phi =list(param =c(0.5, 2/3)),
+      phi =list(param = c(0.5, 2/3)),
       prec = prior.prec.sp) 
-    )
+  )
+
+# f_besag_la <- n ~ 
+#   # IMD + prop_minority + log(pop_dens) +
+#   # f(w, model = "rw1",
+#   #   hyper = list(prec = prior.prec.tp),
+#   #   values = seq(min(dat$w),max(dat$w)),
+#   #   scale.model = T) +
+#   f(wk_since_first, model = "rw2",
+#     values = seq(min(dat$wk_since_first),max(dat$wk_since_first)),
+#     replicate = la,
+#     hyper = list(prec = prior.prec.tp),
+#     scale.model = T) +
+#  f(la, model = "besag", graph = g,
+#     scale.model = T,
+#     constr = T,
+#     hyper=list(
+#       # phi =list(param =c(0.5, 2/3)),
+#       prec = prior.prec.sp) 
+#     )
 
 # f_iid <- n ~ 
 #   f(la, model = "iid", 
@@ -229,14 +250,17 @@ f_bym_geog <- n ~
 
 
 ## Fit all models ##
-formulae <- list(base = f_base, base_geog = f_base_geog, iid = f_iid, iid_geog = f_iid_geog, BYM = f_bym, BYM_geog = f_bym_geog) #, BYM_geog_nocovs = f_bym_geog_nocovs 
-fits <- lapply(formulae, fit_mod, dat, expected = expected)
+# formulae <- list(base = f_base, base_geog = f_base_geog, iid = f_iid, iid_geog = f_iid_geog, BYM = f_bym, BYM_geog = f_bym_geog) #, BYM_geog_nocovs = f_bym_geog_nocovs
+# fits <- lapply(formulae, fit_mod, dat, expected = expected)
 
-saveRDS(fits, file = here::here("output",sprintf("fits_%s_%s.rds",measure, wave)))
+# saveRDS(fits, file = here::here("output",sprintf("fits_%s_%s.rds",measure, wave)))
 
 # Just final model
-fit <- fit_mod(f_iid, dat, expected = expected)
-saveRDS(fit, file = here::here("output",sprintf("fit_iid_%s_%s.rds",measure, wave)))
+fit <- fit_mod(f_bym_geog, dat, expected = expected)
+saveRDS(fit, file = here::here("output",sprintf("fit_final_%s_%s.rds",measure, wave)))
+
+# fit_besag_la <- fit_mod(f_besag_la, dat, expected = expected)
+# saveRDS(fit_besag_la, file = here::here("output",sprintf("fit_besag_la_%s_%s.rds",measure, wave)))
 
 
 # ## Draw posterior samples ##
@@ -244,5 +268,5 @@ saveRDS(fit, file = here::here("output",sprintf("fit_iid_%s_%s.rds",measure, wav
 # saveRDS(samples, file =  here::here("output",sprintf("samples_%s_%s.rds",measure, wave)))
 
 # Just final model
-# samples <- inla.posterior.sample(fit, n = 1000)
-# saveRDS(samples, file = here::here("output",sprintf("samples_iid_%s_%s.rds",measure, wave)))
+samples <- inla.posterior.sample(fit, n = 1000)
+saveRDS(samples, file = here::here("output",sprintf("samples_final_%s_%s.rds",measure, wave)))

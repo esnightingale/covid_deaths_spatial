@@ -17,7 +17,7 @@ map_theme <- function () {
           legend.position = c(0,0.5)) 
 }
 
-basic_map <- function(sf, fill, rate1e5 = F){
+basic_map <- function(sf, fill, rate1e5 = F, plot.border = F, border = NULL){
   
   if (rate1e5 == T){
     sf <- mutate(sf, fill = !!sym(fill)*1e5/la_pop)
@@ -29,9 +29,15 @@ basic_map <- function(sf, fill, rate1e5 = F){
     labs(fill = "") +
     annotation_scale(location = "br") +
     map_theme() 
+  
+  if (plot.border == T){ 
+    p <- p + geom_sf(data = border, aes(fill = NULL), alpha = 0, lwd = 0.5, col = "grey") 
+  }
+  
   # annotation_north_arrow(location = "tl", which_north = "true", 
   #     # pad_x = unit(0.75, "in"), pad_y = unit(0.5, "in"),
   #     style = north_arrow_fancy_orienteering) 
+
   return(p)
 }
 
