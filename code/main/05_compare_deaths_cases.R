@@ -11,27 +11,10 @@
 # SETUP
 ################################################################################
 
-library(tidyverse)
-library(INLA)
-library(spdep)
-library(sf)
-library(patchwork)
-library(viridis)
-library(INLAutils)
-library(ggspatial)
-library(lubridate)
-# devtools::install_github('timcdlucas/INLAutils')
-
-theme_set(theme_minimal())
-
-
 # measure <- "deaths"
 wave <- 1
 
-# source(here::here("code","main","functions.R"))
 list.files(here::here("code","utils"), full.names = TRUE) %>% walk(source)
-
-datadir <- "C:/Users/phpuenig/Documents/COVID-19/Data/"
 
 ## Shapefiles
 regions <- readRDS(paste0(datadir,"maps/LA_shp_wpops.rds")) %>%
@@ -400,10 +383,10 @@ dev.off()
 
 deaths[[1]] %>%
   mutate(week = week-14) %>%
-  inner_join(filter(cases[[1]], week > ymd("2020-05-18")), by = c("lad19cd","week"), suffix = c("_d","_c")) %>%
+  inner_join(filter(cases[[1]], week >= ymd("2020-05-18")), by = c("lad19cd","week"), suffix = c("_d","_c")) %>%
   mutate(CFR_obs = n_d/n_c) %>%
   group_by(geography_d) %>%
-  mutate(scale = median(CFR_obs)) %>%
+  mutate(scale_geog = median(CFR_obs)) %>%
   ungroup() -> ratio
 
 scale = median(ratio$CFR_obs)
@@ -620,8 +603,8 @@ dev.off()
 
 
 dat_pred_d %>%
-  mutate(pred_n_scale = sum(pred_n, na.rm = TRUE)/scale,
-         n_scale = sum(n, na.rm = TRUE)/scale,
+  mutate(pred_n_scale = pred_n/scale,
+         n_scale = n/scale,
          week = week - 14) %>%
   select(name, lad19nm, week, pred_n_scale, n_scale) %>%
   inner_join(dat_pred_c) -> dat_pred_scale
@@ -632,8 +615,8 @@ print(
     filter(la %in% la_samp) %>%
     ggplot(aes(week)) + 
     # geom_line(aes(week, pred_n, group = name), alpha = 0.1, col = "grey") +
-    geom_line(aes(y =pred_n/scale, group = name), alpha = 0.1, col = "steelblue") +
-    geom_point(aes(y = n/scale), col = "navy") +
+    geom_line(aes(y = pred_n_scale, group = name), alpha = 0.1, col = "steelblue") +
+    geom_point(aes(y = n_scale), col = "navy") +
     # geom_line(aes(week-lag, n/scale), col = "steelblue", lty = "dashed") +
     geom_point(aes(y = n)) + 
     geom_line(aes(y = n), col = "grey") +
@@ -657,16 +640,19 @@ dat_lag_cfr %>%
             pred_n_c = sum(pred_n_c),
             pred_n_d = sum(pred_n_d),
             E_tot = sum(E_wk),
-            perc_diff = (pred_n_d_scale - n_c)*100/n_c) -> scale_deaths_sim
+            perc_diff = (pred_n_d_scale - n_c)*100/n_c,
+            ratio = pred_n_d_scale/n_c) -> scale_deaths_sim
 
 
 # Look into the variation of % difference by LTLA:
 scale_deaths_sim %>%
   filter(la %in% la_samp) %>%
-  ggplot(aes(perc_diff)) +
+  ggplot(aes(ratio)) +
   geom_histogram(bins = 40) +
-  geom_vline(aes(xintercept = 0)) +
+  geom_vline(aes(xintercept = 1)) +
   facet_wrap(~lad19nm)
+
+summary(scale_deaths_sim$ratio)
 
 # Map out the median differences
 scale_deaths_sim %>%
@@ -676,32 +662,61 @@ scale_deaths_sim %>%
             pred_n_c = median(pred_n_c),
             pred_n_d = median(pred_n_d),
             pred_n_d_scale = median(pred_n_d_scale),
-            perc_diff = median(perc_diff)) -> scale_deaths_tot # View()
+            perc_diff = median(perc_diff),
+            ratio = median(ratio)) -> scale_deaths_tot # View()
   
+summary(scale_deaths_tot$ratio)
+#   Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
+# 0.5582  1.2991  1.5802  1.6106  1.8812  3.3708
+
 png(here::here("figures","compare","underascertainment_map.png"), height = 1000, width = 1500, res = 150)
 regions %>%
   full_join(scale_deaths_tot) %>%
-  basic_map(fill = "perc_diff") + 
-  scale_fill_gradient2() +
-  labs(fill = "%", title = "Percentage difference between total cases inferred from deaths and observed test positives",
-         subtitle = "Predicted deaths back-dated by two weeks and scaled by a factor of 5")
+  basic_map(fill = "ratio") + 
+  scale_fill_gradient2(midpoint = 1) +
+  labs(fill = "Ratio", title = "Relative difference between inferred total cases and observed test positives",
+       subtitle = paste0("Predicted deaths back-dated by two weeks and scaled by a factor of ",round(1/scale,2)))
+dev.off()
+
+# Differences over time
+scale_deaths_sim %>%
+  group_by(week, sim) %>%
+  summarise(n_c = unique(n_c),
+            n_d = unique(n_d),
+            pred_n_c = median(pred_n_c),
+            pred_n_d = median(pred_n_d),
+            pred_n_d_scale = median(pred_n_d_scale),
+            perc_diff = median(perc_diff),
+            ratio = median(ratio)) -> scale_deaths_time # View()
+
+dat_lag_cfr %>%
+  group_by(week, sim) %>%
+  summarise(n_c = sum(n_c, na.rm = TRUE),
+            pred_n_d_scale = sum(pred_n_d/scale),
+            ratio = pred_n_d_scale/n_c) -> scale_deaths_time
+
+png(here::here("figures","compare","underascertainment_timeline.png"), height = 1000, width = 1500, res = 150)
+scale_deaths_time %>%
+  ggplot(aes(week, ratio, group = sim)) +
+  geom_line(alpha = 0.1, col = "forestgreen")
 dev.off()
 
 ## Which LTLAs are most extreme?
-subset <- slice_max(scale_deaths_tot, abs(perc_diff), n = 9)
+# subset <- slice_max(scale_deaths_tot, abs(ratio - 1), n = 9)
+subset <- slice_min(scale_deaths_tot, ratio, n = 6)
 greatestdiff <- unique(dat_pred_c$la[dat_pred_c$lad19nm %in% subset$lad19nm])
 
-png(here::here("figures","compare","death_inflate_greatestdiff.png"), height = 1000, width = 1500, res = 150)
+png(here::here("figures","compare","death_inflate_under.png"), height = 1000, width = 1500, res = 150)
 print(
-  dat_pred_c %>%
+  dat_pred_scale %>%
     filter(la %in% greatestdiff) %>%
-    ggplot() + 
-    geom_line(aes(week, pred_n, group = name), alpha = 0.1, col = "grey") +
-    geom_point(aes(week, n), col = "black") + 
-    # geom_smooth(aes(week, n), se = TRUE, col = "grey", alpha = 0.5) +
-    geom_line(data = filter(dat_pred_d, la %in% greatestdiff), aes(week-2, pred_n/0.2, group = name), alpha = 0.1, col = "indianred") +
-    geom_point(data = filter(dat_pred_d,la %in% greatestdiff), aes(week-2, n/0.2), col = "maroon") +
+    ggplot(aes(week)) + 
+    geom_line(aes(y = pred_n_scale, group = name), alpha = 0.1, col = "steelblue") +
+    geom_point(aes(y = n_scale), col = "navy") +
+    geom_point(aes(y = n)) + 
+    geom_line(aes(y = n), col = "grey") +
     facet_wrap(~lad19nm, scales = "free") +
+    # scale_x_date(limits = range(dat_pred_geog_scale$week)) +
     theme_minimal()
 )
 dev.off()
@@ -710,7 +725,7 @@ dev.off()
 dat_lag_cfr %>%
   group_by(lad19nm, la, sim) %>%
   summarise(n_c = sum(n_c, na.rm = TRUE),
-            pred_n_d_scale = sum(pred_n_d/0.206)) -> scale_deaths_sim
+            pred_n_d_scale = sum(pred_n_d/scale)) -> scale_deaths_sim
 
 
 # Total number of cases missed
@@ -719,17 +734,8 @@ scale_deaths_sim %>%
   summarise(missed_cases = sum(pred_n_d_scale) - sum(n_c)) -> tot_missed_sim
 
 summary(tot_missed_sim$missed_cases)
-# Without lag:
-#  Min.  1st Qu.   Median     Mean  3rd Qu.     Max. 
-# 46.87  5665.41  6850.73  6831.55  7995.78 12124.89 
-#
-# With 7 day lag:
-#  Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
-# 700.8  6280.7  7486.8  7464.6  8633.0 12718.1 
-# 
-# With 14 day lag, scale = 0.21:
 #   Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
-#  11073   16959   18201   18181   19400   23726 
+# 103369  111154  112851  112829  114522  120251 
 
 ggplot(tot_missed_sim, aes(missed_cases)) +
   geom_histogram(bins = 50)

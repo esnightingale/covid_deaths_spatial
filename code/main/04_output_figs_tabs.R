@@ -11,24 +11,7 @@
 # SETUP
 ################################################################################
 
-library(tidyverse)
-library(INLA)
-library(spdep)
-library(sf)
-library(patchwork)
-library(viridis)
-library(INLAutils)
-library(cowplot)
-library(ggspatial)
-library(ggforce)
-# devtools::install_github('timcdlucas/INLAutils')
-
-theme_set(theme_minimal())
-
-# source(here::here("code","main","functions.R"))
 list.files(here::here("code","utils"), full.names = TRUE) %>% walk(source)
-
-datadir <- "C:/Users/phpuenig/Documents/COVID-19/Data/"
 
 measure <- "deaths"
 wave <- 1
@@ -47,8 +30,6 @@ period <- dat_all$breaks[[wave]]
 
 linelist <- readRDS(paste0(datadir, sprintf("linelist_%s.rds",measure))) 
 
-# %>%
-#   filter(wod < ymd("2020-08-02")) # filter to last week in July
 # covid_deaths_raw <- readRDS(paste0(datadir, "Deaths/covid_deaths_raw.rds"))
 # covid_deaths_E <- readRDS(paste0(datadir, "Deaths/covid_deaths_E.rds"))
 
@@ -80,15 +61,6 @@ model_comp
 saveRDS(model_comp, here::here("output",paste0("model_comp_",measure,".rds")))
 
 # ---------------------------------------------------------------------------- #
-# MODEL SUMMARY PLOTS
-
-# pdf(here::here("figures",measure,"fits.pdf"), height = 8, width = 12)
-# for (m in seq_along(fits)){
-#   plot.model(fits[[m]])
-# }
-# dev.off()
-
-# ---------------------------------------------------------------------------- #
 # MAP MODEL MSE
 
 get_resid <- function(fit){
@@ -100,22 +72,6 @@ get_resid <- function(fit){
            MSqE = (n-mu)^2,
            logs = log(fit$cpo$cpo)) 
 }
-
-# resids2 <- get_resid(fit_final_deaths_2) %>%
-#   group_by(lad19cd) %>%
-#   summarise(logs = -mean(logs),
-#             resid = mean(resid))
-# 
-# regions %>%
-#   full_join(resids2) %>%
-#   basic_map(fill = "logs") -> logs
-# 
-# regions %>%
-#   full_join(resids2) %>%
-#   basic_map(fill = "resid") +
-#   scale_fill_gradient2(midpoint = 0) -> resid
-# 
-# logs + resid
 
 resids <- lapply(fits, function(fit) get_resid(fit)$resid) %>%
   bind_cols() %>%
@@ -309,45 +265,47 @@ for (s in seq_along(samples)){
 
 nval <- nrow(dat)
 
-  preds <- bind_cols(lapply(samples_final, get_preds))
+preds <- bind_cols(lapply(samples_final, get_preds))
 
-  dat_pred <- bind_cols(dplyr::select(dat, geography, lad19cd, lad19nm, la, la_pop, week, E_wk, n), preds) %>%
-    pivot_longer(cols = -1:-8) %>%
-    mutate(pred_n = exp(value)*E_wk)
-  
-  png(here::here("figures",measure,"map_pred_quants.png"), height = 1000, width = 1600, res = 150)
-  print(
-    dat_pred %>%
-      group_by(lad19cd, name) %>%
-      # sum over weeks
-      summarise(value = sum(pred_n)) %>%
-      # average over samples
-      group_by(lad19cd) %>%
-      summarise(q50 = median(value),
-                q01 = quantile(value, 0.01),
-                q99 = quantile(value, 0.99)) %>% 
-      pivot_longer(cols = contains("q")) %>% 
-      left_join(regions) %>%
-      basic_map(fill = "value", rate1e5 = TRUE) +
-      facet_wrap(~name) +
-      labs(title = "Predicted deaths per 100,000: Quantiles of 1000 posterior samples per local authority")
-  )
-  dev.off()
+dat_pred <- bind_cols(dplyr::select(dat, geography, lad19cd, lad19nm, la, la_pop, week, E_wk, n), preds) %>%
+  pivot_longer(cols = -1:-8) %>%
+  mutate(pred = exp(value))
 
-  png(here::here("figures",measure,"preds_geog.png"), height = 1000, width = 1200, res = 150)
-  print(
-    dat_pred %>%
-      group_by(week, name, geography) %>%
-      summarise(pred_n = sum(pred_n),
-                n = sum(n)) %>%
-      ggplot() + 
-      geom_line(aes(week, pred_n, group = name, col = geography), alpha = 0.1, col = "grey") +
-      geom_point(aes(week, n)) + 
-      facet_wrap(~geography) +
-      labs(y = "Predicted deaths", x = "Week") +
-      theme_minimal()
-  )
-  dev.off()
+png(here::here("figures",measure,"map_pred_quants.png"), height = 1000, width = 1600, res = 150)
+print(
+  dat_pred %>%
+    group_by(lad19cd, name) %>%
+    # average over weeks
+    summarise(value = mean(pred)) %>%
+    # average over samples
+    group_by(lad19cd) %>%
+    summarise(q50 = median(value),
+              q01 = quantile(value, 0.01),
+              q99 = quantile(value, 0.99)) %>% 
+    pivot_longer(cols = contains("q")) %>% 
+    left_join(regions) %>%
+    basic_map(fill = "value", rate1e5 = TRUE) +
+    facet_wrap(~name) +
+    labs(title = "Average predicted deaths relative to expected per LTLA",
+         subtitle = "Quantiles of 1000 posterior samples")
+)
+dev.off()
+
+png(here::here("figures",measure,"preds_geog.png"), height = 1000, width = 1200, res = 150)
+print(
+  dat_pred %>%
+    group_by(week, name, geography) %>%
+    summarise(pred = mean(pred),
+              obs = sum(n)/sum(E_wk)) %>%
+    ggplot() + 
+    geom_line(aes(week, pred, group = name, col = geography), alpha = 0.1, col = "grey") +
+    geom_point(aes(week, obs)) + 
+    facet_wrap(~geography, ) +
+    labs(y = "Predicted versus expected deaths", x = "Week") +
+    theme_minimal()
+)
+dev.off()
+
 
   
   la_samp_list <- list(random = sample(dat$la,9),

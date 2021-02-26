@@ -11,22 +11,11 @@
 # SETUP
 ################################################################################
 
-library(tidyverse)
-library(lubridate)
-library(INLA)
-library(spdep)
-library(sf)
-library(here)
-
 measure <- "deaths"
 expected <- "E"
-wave <- 2
-
-# For case models, exclude covariates and use raw LA pop as offset rather than age adjusted.
+wave <- 1
 
 list.files(here::here("code","utils"), full.names = TRUE) %>% walk(source)
-
-datadir <- "C:/Users/phpuenig/Documents/COVID-19/Data/"
 
 ## Shapefiles
 regions <- readRDS(paste0(datadir,"maps/LA_shp_wpops.rds")) %>%
@@ -43,11 +32,6 @@ dat_all <- readRDS(here::here("data",paste0(measure,".rds")))
 
 dat <- dat_all[[wave]]
 period <- dat_all$breaks[[wave]]
-
-# dat <- readRDS(paste0(datadir, "Deaths/dat_deaths_2020-01-01_2020-06-30.rds"))
-
-# Non-age-stratified expected cases
-# dat$E_wk <- dat$E_wk_unstrat
 
 ################################################################################
 # PRIOR SPECIFICATION
@@ -101,10 +85,10 @@ f_base <- n ~
    #tb_inc + #cv_mort + can_mort +
   f(w, model = "rw1",
     hyper = list(prec = prior.prec.tp),
-    values = seq(min(dat$w),max(dat$w)),
+    # values = seq(min(dat$w),max(dat$w)),
     scale.model = T) +
   f(wk_since_first, model = "rw2",
-    values = seq(min(dat$wk_since_first),max(dat$wk_since_first)),
+    # values = seq(min(dat$wk_since_first),max(dat$wk_since_first)),
     hyper = list(prec = prior.prec.tp),
     scale.model = T)
 
@@ -113,12 +97,12 @@ f_base_geog <- n ~
   IMD_quint + prop_minority + #log(pop_dens) +
   f(w, model = "rw1",
     hyper = list(prec = prior.prec.tp),
-    values = seq(min(dat$w),max(dat$w)), 
+    # values = seq(min(dat$w),max(dat$w)), 
     scale.model = T) +
   f(wk_since_first, model = "rw2",
     hyper = list(prec = prior.prec.tp),
     replicate = geog,
-    values = seq(min(dat$wk_since_first),max(dat$wk_since_first)),
+    # values = seq(min(dat$wk_since_first),max(dat$wk_since_first)),
     scale.model = T) 
 
 
@@ -129,10 +113,10 @@ f_iid <- n ~
    #tb_inc + #cv_mort + can_mort +
   f(w, model = "rw1",
     hyper = list(prec = prior.prec.tp),
-    values = seq(min(dat$w),max(dat$w)),
+    # values = seq(min(dat$w),max(dat$w)),
     scale.model = T) +
   f(wk_since_first, model = "rw2",
-    values = seq(min(dat$wk_since_first),max(dat$wk_since_first)),
+    # values = seq(min(dat$wk_since_first),max(dat$wk_since_first)),
     hyper = list(prec = prior.prec.tp),
     scale.model = T) +
  f(la, model = "iid", 
@@ -146,12 +130,12 @@ f_iid_geog <- n ~
   IMD_quint + prop_minority + #log(pop_dens) +
   f(w, model = "rw1",
     hyper = list(prec = prior.prec.tp),
-    values = seq(min(dat$w),max(dat$w)), 
+    # values = seq(min(dat$w),max(dat$w)), 
     scale.model = T) +
   f(wk_since_first, model = "rw2",
     hyper = list(prec = prior.prec.tp),
     replicate = geog,
-    values = seq(min(dat$wk_since_first),max(dat$wk_since_first)),
+    # values = seq(min(dat$wk_since_first),max(dat$wk_since_first)),
     scale.model = T) +
  f(la, model = "iid", 
     constr = T,
@@ -164,10 +148,10 @@ f_bym <- n ~
   IMD_quint + prop_minority + #log(pop_dens) +
   f(w, model = "rw1",
     hyper = list(prec = prior.prec.tp),
-    values = seq(min(dat$w),max(dat$w)),
+    # values = seq(min(dat$w),max(dat$w)),
     scale.model = T) +
   f(wk_since_first, model = "rw2",
-    values = seq(min(dat$wk_since_first),max(dat$wk_since_first)),
+    # values = seq(min(dat$wk_since_first),max(dat$wk_since_first)),
     hyper = list(prec = prior.prec.tp),
     scale.model = T) +
  f(la, model = "bym2", graph = g,
@@ -183,10 +167,10 @@ f_bym_geog <- n ~
   IMD_quint + prop_minority + #log(pop_dens) +
   f(w, model = "rw1",
     hyper = list(prec = prior.prec.tp),
-    values = seq(min(dat$w),max(dat$w)),
+    # values = seq(min(dat$w),max(dat$w)),
     scale.model = T) +
   f(wk_since_first, model = "rw2",
-    values = seq(min(dat$wk_since_first),max(dat$wk_since_first)),
+    # values = seq(min(dat$wk_since_first),max(dat$wk_since_first)),
     hyper = list(prec = prior.prec.tp),
     replicate = geog,
     scale.model = T) +
@@ -250,23 +234,20 @@ f_bym_geog <- n ~
 
 
 ## Fit all models ##
-# formulae <- list(base = f_base, base_geog = f_base_geog, iid = f_iid, iid_geog = f_iid_geog, BYM = f_bym, BYM_geog = f_bym_geog) #, BYM_geog_nocovs = f_bym_geog_nocovs
-# fits <- lapply(formulae, fit_mod, dat, expected = expected)
+formulae <- list(base = f_base, base_geog = f_base_geog, iid = f_iid, iid_geog = f_iid_geog, BYM = f_bym, BYM_geog = f_bym_geog) #, BYM_geog_nocovs = f_bym_geog_nocovs
+fits <- lapply(formulae, fit_mod, dat, expected = expected)
 
-# saveRDS(fits, file = here::here("output",sprintf("fits_%s_%s.rds",measure, wave)))
+saveRDS(fits, file = here::here("output/expanded_data",sprintf("fits_%s_%s.rds",measure, wave)))
 
 # Just final model
-fit <- fit_mod(f_bym_geog, dat, expected = expected)
-saveRDS(fit, file = here::here("output",sprintf("fit_final_%s_%s.rds",measure, wave)))
-
-# fit_besag_la <- fit_mod(f_besag_la, dat, expected = expected)
-# saveRDS(fit_besag_la, file = here::here("output",sprintf("fit_besag_la_%s_%s.rds",measure, wave)))
+# fit <- fit_mod(f_bym_geog, dat, expected = expected)
+# saveRDS(fit, file = here::here("output",sprintf("fit_final_%s_%s.rds",measure, wave)))
 
 
 # ## Draw posterior samples ##
-# samples <- lapply(fits, inla.posterior.sample,n = 1000)
-# saveRDS(samples, file =  here::here("output",sprintf("samples_%s_%s.rds",measure, wave)))
+samples <- lapply(fits, inla.posterior.sample,n = 1000)
+saveRDS(samples, file =  here::here("output/expanded_data",sprintf("samples_%s_%s.rds",measure, wave)))
 
 # Just final model
-samples <- inla.posterior.sample(fit, n = 1000)
-saveRDS(samples, file = here::here("output",sprintf("samples_final_%s_%s.rds",measure, wave)))
+# samples <- inla.posterior.sample(fit, n = 1000)
+# saveRDS(samples, file = here::here("output",sprintf("samples_final_%s_%s.rds",measure, wave)))

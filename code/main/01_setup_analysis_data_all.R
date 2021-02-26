@@ -7,6 +7,7 @@
 ################################################################################
 
 library(tidyverse)
+library(lubridate)
 
 # Local data directory
 datadir <- "C:/Users/phpuenig/Documents/COVID-19/Data/"

@@ -134,7 +134,7 @@ pit_hist <- function(fit, bins = 30){
 }
 
 
-get_preds <- function(sample){
+get_preds <- function(sample,dat){
   pred <- sample$latent[1:nrow(dat)]
 }
 
