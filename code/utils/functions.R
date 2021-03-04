@@ -14,24 +14,24 @@ map_theme <- function () {
     theme(axis.title=element_blank(),
           axis.text=element_blank(),
           axis.ticks=element_blank(),
-          legend.position = c(0,0.5)) 
+          legend.position = c(0.1,0.5)) 
 }
 
-basic_map <- function(sf, fill, rate1e5 = F, plot.border = F, border = NULL){
+basic_map <- function(sf, fill, rate1e5 = F, plot.border = F){
   
   if (rate1e5 == T){
     sf <- mutate(sf, fill = !!sym(fill)*1e5/la_pop)
   }else{sf <- mutate(sf, fill = !!sym(fill))}
   
-  p <- ggplot(sf, aes(geometry = geometry, fill = fill)) +
-    geom_sf(colour = NA) +
+  p <- ggplot(sf) +
+    geom_sf(aes(geometry = geometry, fill = fill), colour = NA) +
     scale_fill_viridis_c(na.value = "grey") +
     labs(fill = "") +
     annotation_scale(location = "br") +
     map_theme() 
   
   if (plot.border == T){ 
-    p <- p + geom_sf(data = border, aes(fill = NULL), alpha = 0, lwd = 0.5, col = "grey") 
+    p <- p + geom_sf(data = border, alpha = 0, lwd = 0.5, col = "grey") 
   }
   
   # annotation_north_arrow(location = "tl", which_north = "true", 
@@ -67,8 +67,7 @@ map_wlondon <- function(sf, fill, rate1e5 = F){
     sf <- mutate(sf, fill = !!sym(fill)*1e5/la_pop)
   }else{sf <- mutate(sf, fill = !!sym(fill))}
   
-  
-  london <- filter(geog == "London borough")
+  london <- filter(sf, geography == "London borough")
   
   p <- ggplot(sf, aes(geometry = geometry, fill = fill)) +
     geom_sf() +
