@@ -12,6 +12,7 @@
 # SETUP
 ################################################################################
 
+library(tidyverse)
 list.files(here::here("code","utils"), full.names = TRUE) %>% walk(source)
 
 # Figure output directory
@@ -22,6 +23,7 @@ regions <- readRDS(paste0(datadir,"maps/LA_shp_wpops.rds")) %>%
   st_set_crs("+OSGB:1936 +units=m +no_defs") %>%
   filter(grepl("E", lad19cd))
 
+border <- st_union(regions)
 regions.df <- st_drop_geometry(regions)
 
 # LTLA-week-aggregated observed deaths, expected deaths and LTLA covariates
@@ -37,9 +39,12 @@ linelist_deaths <- readRDS(paste0(datadir, sprintf("linelist_%s.rds","deaths")))
 linelist_cases <- readRDS(paste0(datadir, sprintf("linelist_%s.rds","cases"))) %>%
   mutate(month = lubridate::month(date, label = TRUE)) 
 
-# ---------------------------------------------------------------------------- #
+################################################################################
+# DESCRIPTIVE SUMMARIES/PLOTS
+################################################################################
 
 ## GEOGRAPHY ##
+
 png(here::here("figures","descriptive","map_geog.png"), height = 800, width = 900, res = 150)
 regions %>% basic_map(fill = "geography") + scale_fill_viridis_d()
 dev.off()
@@ -61,8 +66,21 @@ dev.off()
 
 cov_names <- c("pop_dens", "IMD", "prop_minority","prop_kw")
 deaths[[1]] %>%
-  group_by(lad19cd) %>%
-  summarise_at(vars(cov_names), .funs = base::mean) -> covs
+  group_by(geography, lad19cd) %>%
+  summarise_at(all_of(cov_names), .funs = base::mean) %>%
+  full_join(dplyr::select(regions.df, lad19cd, med_age)) %>%
+  ungroup() -> covs
+
+# Summarise covariates
+get_quants <- function(var){ paste(round(quantile(var, p = c(0.25,0.5,0.75)),2), collapse = ", ")}
+# By geography
+covs %>% 
+  group_by(geography) %>%
+  summarise(across(c(med_age,IMD,prop_minority), get_quants))
+
+# Overall
+covs %>% 
+  summarise(across(c(med_age,IMD,prop_minority), get_quants))
 
 regions %>%
   full_join(covs) %>%
@@ -95,9 +113,12 @@ png(here::here("figures","descriptive","map_covariates.png"), height = 1200, wid
   (map_mino + map_kw)
 dev.off()
 
+
+
+
 # ---------------------------------------------------------------------------- #
 
-## RATE BY COVARIATES ##
+## MORTALITY BY COVARIATES ##
 
 plot_covs <- function(cov, y_trans = "log10", x_trans = "identity", method = "lm"){
   
@@ -148,7 +169,7 @@ dev.off()
 
 # ---------------------------------------------------------------------------- #
 
-## TIME SERIES - total ##
+## TIME SERIES - TOTAL ##
 
 linelist_cases %>%
   group_by(lad19cd, week, age_group) %>%
@@ -244,55 +265,54 @@ dev.off()
 
 # ---------------------------------------------------------------------------- #
 
-## Death : case ratio
-## Calculate only with cases confirmed after pillar 2 testing introduced
+## DEATHS:CASES RATIO ##
 
-calc_ratio <- function(lag){
+calc_ratio <- function(lag, cutoff = 1){
+  
 deaths[[1]] %>%
-  mutate(week = week-lag) %>%
-  inner_join(cases[[1]], by = c("lad19cd","week"), suffix = c("_d","_c")) %>%
-  mutate(CFR_obs = n_d/n_c,
-         period = factor(case_when(week < ymd("2020-05-18") ~ 1,
-                                      week >= ymd("2020-05-18") ~ 2),
-                            labels = c("2020-01-04 - 2020-05-17","2020-05-18 - 2020-06-28"))) %>%
-  group_by(geography_d) %>%
+  mutate(week = week-lag) %>%  
+  inner_join(dplyr::select(cases[[1]],lad19cd,geography,week,n), by = c("lad19cd","week","geography"), suffix = c("_d","_c")) %>%
+  mutate(CFR_obs = n_c/n_d,
+         period = case_when(week < ymd("2020-05-18") ~ 1,
+                                      week >= ymd("2020-05-18") ~ 2)) %>%
+  group_by(geography) %>%
   mutate(scale = median(CFR_obs)) %>%
   ungroup() -> ratio
 
-print(summary(ratio$CFR_obs))
-#     Min.  1st Qu.   Median     Mean  3rd Qu.     Max. 
-# 0.004008 0.090909 0.153846 0.232584 0.272727 2.000000 
+ratio$CFR_obs[ratio$n_c < cutoff] <- NA
+print(summary(ratio$CFR_obs[ratio$period == 1]))
+print(summary(ratio$CFR_obs[ratio$period == 2]))
 
 ## Total ratio, with lag
 ratio %>%
-  filter(period == "2020-05-18 - 2020-06-28") %>%
+  filter(period == 2) %>%
   summarise(n_d = sum(n_d, na.rm = T),
             n_c = sum(n_c, na.rm = T),
-            CFR_obs = n_d/n_c) -> ratio_tot
+            CFR_obs = n_c/n_d) -> ratio_tot
 print(ratio_tot)
-#       n_d   n_c CFR_obs
-#   1  3254 26756   0.122
 
 ## Ratio per LTLA
 ratio %>%
   group_by(lad19cd, period) %>%
   summarise(n_d = sum(n_d, na.rm = T),
             n_c = sum(n_c, na.rm = T),
-            CFR_obs = n_d/n_c) -> ratio_la
+            CFR_obs = n_c/n_d) %>%
+  ungroup() %>%
+  full_join(data.frame(lad19cd = unique(regions$lad19cd), period = 1:2))-> ratio_la
 
 print(summary(ratio_la$CFR_obs))
-#    Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
-# 0.02935 0.11765 0.16667 0.22368 0.26087 2.00000 
 
-
-png(here::here("figures","compare",paste0("map_obs_cfr_",lag,".png")), height = 800, width = 1000, res = 150)
+png(here::here("figures","compare",paste0("map_obs_cfr_",lag,".png")), height = 800, width = 1400, res = 150)
 print(
 regions %>%
+  # full_join(filter(ratio_la,period == 2)) %>%
   full_join(ratio_la) %>%
+  mutate(period = factor(period,labels = c("2020-01-04 - 2020-05-17","2020-05-18 - 2020-06-28"))) %>%
   basic_map(fill = "CFR_obs") +
   facet_wrap(~period) +
-  labs(title = "Observed ratio of deaths to cases before/after expansion of Pillar 2 testing",
-       subtitle = paste(lag,"day lag"),
+  labs(title = "Observed ratio of cases to deaths before and after expansion of Pillar 2 testing",
+       # subtitle = paste(lag,"day lag"),
+       caption = paste("Ratios where no. deaths <", cutoff,"are not calculated"),
        fill = "Ratio")
 )
 dev.off()
@@ -301,14 +321,34 @@ return(ratio)
 
 }
 
-ratio_7 <- calc_ratio(7)
-ratio_14 <- calc_ratio(14)
+ratio_7 <- calc_ratio(7,1)
+ratio_14 <- calc_ratio(14,1)
 
-ratio_la %>%
+ratio_7 %>%
   group_by(geography, period) %>%
-  summarise(scale = unique(scale)) -> geog_scale
+  summarise(n_d = sum(n_d, na.rm = T),
+            n_c = sum(n_c, na.rm = T),
+            CFR_obs = n_c/n_d) %>%
+  group_by(geography, period) %>%
+  summarise(scale = unique(scale)) -> geog_scale7
 
-geog_scale
+geog_scale7
+# geography_d               scale
+# <chr>                     <dbl>
+#   1 London Borough            0.2  
+# 2 Metropolitan District     0.167
+# 3 Non-metropolitan District 0.231
+# 4 Unitary Authority         0.189
+# 
+ratio_14 %>%
+  group_by(geography, period) %>%
+  summarise(n_d = sum(n_d, na.rm = T),
+            n_c = sum(n_c, na.rm = T),
+            CFR_obs = n_d/n_c) %>%
+group_by(geography, period) %>%
+  summarise(scale = unique(scale)) -> geog_scale14
+
+geog_scale14
 # geography_d               scale
 # <chr>                     <dbl>
 #   1 London Borough            0.2  
