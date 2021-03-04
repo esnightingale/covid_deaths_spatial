@@ -22,9 +22,6 @@ regions.df <- st_drop_geometry(regions)
 
 list.files(here::here("code","utils"), full.names = TRUE) %>% walk(source)
 
-# source(here::here("code","main","01_calculate_E.R"))
-# source(here::here("code","main","01_setup_analysis_data.R"))
-
 
 ## DEATHS ##
 source(here::here("code","main","00_setup_deaths.R"))
