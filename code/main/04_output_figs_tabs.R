@@ -36,10 +36,10 @@ linelist <- readRDS(paste0(datadir, sprintf("linelist_%s.rds",measure)))
 weekrange <- seq(min(dat$w), max(dat$w))
 
 # Fitted models and posterior samples
-fits <- readRDS(file = here::here("output",
+fits <- readRDS(file = here::here("output/expanded_data",
                                   sprintf("fits_%s_%s.rds",measure, wave)))
 fit_final <- fits[[6]]
-samples <- readRDS(file = here::here("output",
+samples <- readRDS(file = here::here("output/expanded_data",
                                      sprintf("samples_%s_%s.rds",measure, wave)))
 samples_final <- samples[[6]]
 
@@ -58,7 +58,7 @@ model_comp %>%
 
 model_comp
 
-saveRDS(model_comp, here::here("output",paste0("model_comp_",measure,".rds")))
+saveRDS(model_comp, here::here("output/expanded_data",paste0("model_comp_",measure,".rds")))
 
 # ---------------------------------------------------------------------------- #
 # MAP MODEL MSE
@@ -265,7 +265,7 @@ for (s in seq_along(samples)){
 
 nval <- nrow(dat)
 
-preds <- bind_cols(lapply(samples_final, get_preds))
+preds <- bind_cols(lapply(samples_final, get_preds, dat))
 
 dat_pred <- bind_cols(dplyr::select(dat, geography, lad19cd, lad19nm, la, la_pop, week, E_wk, n), preds) %>%
   pivot_longer(cols = -1:-8) %>%
@@ -314,7 +314,7 @@ dev.off()
   
   for (l in seq_along(la_samp_list)){
     png(here::here("figures",measure,paste0("preds_la",l,".png")), height = 1000, width = 1200, res = 150)
-    plot_la_samp(dat_pred, la_samp_list[[l]])
+    plot_la_samp(dat_pred, la_samp_list[[1]])
     dev.off()
   }
   
