@@ -17,21 +17,26 @@ map_theme <- function () {
           legend.position = c(0.1,0.5)) 
 }
 
-basic_map <- function(sf, fill, rate1e5 = F, plot.border = F){
+basic_map <- function(sf, fill, rate1e5 = F, plot.border = F, scale = T){
   
   if (rate1e5 == T){
     sf <- mutate(sf, fill = !!sym(fill)*1e5/la_pop)
   }else{sf <- mutate(sf, fill = !!sym(fill))}
   
-  p <- ggplot(sf) +
-    geom_sf(aes(geometry = geometry, fill = fill), colour = NA) +
+  p <- ggplot() +
+    # Base layer to avoid gaps with missing fill values when faceting
+    geom_sf(data = regions, aes(geometry = geometry), fill = "grey", colour = NA) +
+    geom_sf(data = sf, aes(geometry = geometry, fill = fill), colour = NA) +
     scale_fill_viridis_c(na.value = "grey") +
     labs(fill = "") +
-    annotation_scale(location = "br") +
     map_theme() 
   
   if (plot.border == T){ 
     p <- p + geom_sf(data = border, alpha = 0, lwd = 0.5, col = "grey") 
+  }
+  
+  if (scale == T){ 
+    p <- p + annotation_scale(location = "br") 
   }
   
   # annotation_north_arrow(location = "tl", which_north = "true", 
@@ -88,11 +93,11 @@ map_wlondon <- function(sf, fill, rate1e5 = F){
 
 
 ## INLA MODEL SPECIFICATION ##
-fit_mod <- function(f, dat, expected = "E"){
+fit_mod <- function(f, dat, expected = "E", family = "nbinomial"){
   
   if (expected == "E"){
   fit <- inla(f,
-              "nbinomial",
+              family,
               data = dat,
               E = E_wk,
               # offset = log(la_age_pop),
@@ -100,11 +105,12 @@ fit_mod <- function(f, dat, expected = "E"){
                                    waic=TRUE, 
                                    cpo = TRUE,
                                    config = TRUE),
+              control.predictor = list(compute = TRUE, link = 1),
               control.fixed=list(mean=0, prec=0.1, mean.intercept=0, prec.intercept=0.001),
               verbose = T)
   }else{
     fit <- inla(f,
-                "nbinomial",
+                family,
                 data = dat,
                 # E = E_wk,
                 offset = log(la_pop),
@@ -112,21 +118,38 @@ fit_mod <- function(f, dat, expected = "E"){
                                      waic=TRUE, 
                                      cpo = TRUE,
                                      config = TRUE),
+                control.predictor = list(compute = TRUE, link = 1),
                 control.fixed=list(mean=0, prec=0.1, mean.intercept=0, prec.intercept=0.001),
+                control.inla = list(cmin = 0),
                 verbose = T)
   }
   return(fit)
 }
 
-
+## MODEL COMPARISON TABLE ##
+model_comp <- function(fit.list){
+  return(
+  data.frame(DIC = sapply(fit.list, function(m){return(m$dic$dic)}),
+             WAIC = sapply(fit.list, function(m){return(m$waic$waic)}),
+             logs = sapply(fit.list, function(m){return(-mean(log(m$cpo$cpo), na.rm = T))})) %>% 
+    rownames_to_column(var = "Model") %>%
+    mutate(diff_WAIC = WAIC - min(WAIC),
+           diff_DIC = DIC - min(DIC),
+           diff_logs = logs - min(logs)) %>%
+    arrange(diff_WAIC) %>%
+    mutate(across(-Model, function(x) round(x,3))) 
+  )
+}
 
 ## PIT HISTOGRAM ##
 pit_hist <- function(fit, bins = 30){
+  print(summary(fit$cpo$failure))
   plotdata <- data.frame(pit = fit$cpo$pit)
   return(
     ggplot(plotdata, aes(pit, after_stat(density))) + 
       geom_histogram(fill = "white", col = "black", bins = bins) + 
       geom_hline(yintercept = 1, lty = "dashed", col = "red") + 
+      ylim(0,1.5) +
       theme_minimal()+ 
       labs(x = "Probability Integral Transform (PIT)", y = "Density")
   )

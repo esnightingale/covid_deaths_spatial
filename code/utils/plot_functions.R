@@ -95,15 +95,21 @@ plot_one_la <- function(laID){
 }
 
 
-plot_la_samp <- function(data, la_samp){
-  print(
+plot_la_samp <- function(data, la_samp, pred = "pred_n", obs = "n"){
+  
+  data %>%
+    filter(la %in% la_samp) %>%
+    group_by(week, lad19nm) %>%
+    summarise(med = median(!!sym(pred))) -> medians
+  return(
     data %>%
-      dplyr::filter(la %in% la_samp) %>%
+      filter(la %in% la_samp) %>%
       ggplot() +
-      geom_line(aes(week, pred_n, group = name), alpha = 0.1, col = "grey") +
-      geom_point(aes(week, n)) +
+      geom_line(aes(week, !!sym(pred), group = name), alpha = 0.1, col = "grey") +
+      geom_point(aes(week, !!sym(obs))) +
       facet_wrap(~lad19nm) +
-      theme_minimal()
+      theme_minimal() +
+      geom_line(data = medians, aes(week, med), col = "darkgrey") 
   )
 }
 
@@ -113,9 +119,9 @@ plot_la_tot <- function(data, wave = 1, title){
   
   data[[wave]] %>%
     group_by(lad19cd) %>%
-    summarise(n = sum(n)) %>% 
+    summarise(n = sum(n, na.rm = TRUE)) %>% 
     full_join(regions) %>%
-    basic_map(fill = "n", rate1e5 = TRUE) +
+    basic_map(fill = "n", rate1e5 = TRUE, scale = F) +
     labs(title = title,
          subtitle = paste(period[1],"-",period[2])) + 
     map_theme() -> map_tot
