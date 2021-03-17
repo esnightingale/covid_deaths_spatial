@@ -438,7 +438,8 @@ geog_scale14
 linelist_deaths %>% 
   mutate(postP2 = (date_swab >= ymd("2020-05-18"))) %>%
   group_by(postP2) %>%
-  summarise(quants = paste0(quantile(swab_death, c(0.25,0.5,0.75), na.rm = T),collapse = "-"))
+  summarise(mean = mean(swab_death, na.rm = T),
+            quants = paste0(quantile(swab_death, c(0.05,0.25,0.5,0.75,0.95), na.rm = T),collapse = "-"))
 
 summary(linelist_deaths$swab_death)
 #    Min. 1st Qu.  Median    Mean 3rd Qu.    Max.    NA's 
@@ -456,5 +457,6 @@ linelist_deaths %>%
   labs(x = "Days from swab to death", y = "Density") + 
   xlim(c(0,100))
 dev.off()
+
 
 # ---------------------------------------------------------------------------- #

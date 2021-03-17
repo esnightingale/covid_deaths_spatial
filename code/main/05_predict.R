@@ -20,7 +20,7 @@ wave <- 1
 ## Shapefiles
 regions <- readRDS(paste0(datadir,"maps/LA_shp_wpops.rds")) %>%
   filter(grepl("E", lad19cd))
-# border <- st_union(regions)
+border <- st_union(regions)
 
 # Neighbourhood graph
 g <- inla.read.graph(filename = paste0(datadir,"maps/regions_eng.adj"))
@@ -86,73 +86,6 @@ prior.prec.tp
 ######################################
 #   PREDICTION AT ALL TIME POINTS    #
 ######################################
-
-# week_seq <- ymd(seq(min(dat$week), max(dat$week), by = "week"))
-# 
-# vars <- names(dplyr::select(dat, E:E_wk_unstrat, la, lad19cd:first, first_overall:prop_kw))
-# dat.dt <- as.data.table(dat)
-# 
-# # Replicate per ltla (by vars are all values I want to copy down per date):
-# all_dates <- dat.dt[,.(week=week_seq),by = vars]
-# 
-# # Merge and fill count with 0:
-# setkey(dat.dt, week, E, E_wk, E_wk_unstrat, la, lad19cd, lad19nm, la_pop, geog, geography, area_km2, 
-#        pop_dens, IMD, IMD_quint, prop_minority, prop_kw, first_overall, 
-#        wk_first_la_overall, first)
-# setkey(all_dates, week, E, E_wk, E_wk_unstrat, la, lad19cd, lad19nm, la_pop, geog, geography, area_km2, 
-#        pop_dens, IMD, IMD_quint, prop_minority, prop_kw, first_overall, 
-#        wk_first_la_overall, first)
-# 
-# dat.dt <- dat.dt[all_dates,roll=TRUE]
-# 
-# dat.dt %>%
-#   as.data.frame() %>% 
-#   mutate(w = as.integer(lubridate::week(week)),
-#          w2 = w,
-#          w3 = w,
-#          wk_since_first = w - first) -> dat_expand
-# 
-# dat_expand$n[is.na(dat_expand$n)] <- 0
-# dat_expand$wk_since_first[dat_expand$wk_since_first < 0] <- NA
-# 
-# f <- n ~ 
-#   IMD_quint + prop_minority + 
-#   f(w, model = "rw1",
-#     hyper = list(prec = list("pc.prec", c(4.1, 0.01))),
-#     # values = 1:26,
-#     scale.model = T) +
-#   f(wk_since_first, model = "rw2",
-#     # values = -13:25,
-#     hyper = list(prec = list("pc.prec", c(4.1, 0.01))),
-#     replicate = geog,
-#     scale.model = T) +
-#   f(la, model = "bym2", graph = g,
-#     scale.model = T,
-#     constr = T,
-#     hyper=list(
-#       phi =list(param = c(0.5, 2/3)),
-#       prec = list("pc.prec", c(35.1, 0.01))) 
-#   )
-# 
-# fit_all <- inla(f,
-#                  "zeroinflatedpoisson0",
-#                  data = dat_expand,
-#                  E = E_wk,
-#                  control.compute=list(dic=TRUE, 
-#                                       waic=TRUE, 
-#                                       cpo = TRUE,
-#                                       config = TRUE),
-#                  control.predictor = list(compute = TRUE, link = 1),
-#                  control.fixed=list(mean=0, prec=0.1, mean.intercept=0, prec.intercept=0.001),
-#                  verbose = T)
-# summary(fit_all)
-# 
-# # Samples are of *marginal* densities
-# samples_all <- inla.posterior.sample(n = 1000, fit_all)
-# 
-# 
-# saveRDS(list(fit = fit_all, samples = samples_all), file = here::here("output","expanded_data","fit_samples_alltps.rds"))
-
 
 sims <- bind_cols(lapply(samples_final, get_preds, dat))
 dat_sims <- dat %>%
@@ -316,22 +249,22 @@ write.csv(agg_sims, file = here::here("output","pred_quants_avgcov.csv"), row.na
 # ---------------------------------------------------------------------------- #
 ## Scale predictions by death:case ratio ##
 
-lag <- 7
+# lag <- 14
+
 # Function: for each simulated trajectory, scale by a sampled CFR from the observed empirical distribution post-P2
-# lag_rescale <- function(lag, ratio, sims, nsamp = 1){
-#   
+# lag_rescale <- function(lag, ratiodist, sims, nsamp = 1){
+# 
 #   sims_scale <- sims[1,]
 #   for (i in 1:nsamp){
 #   sims %>%
 #     group_by(name) %>%
-#     mutate(scale = EnvStats::remp(1, ratio),
+#     mutate(scale = EnvStats::remp(1, ratiodist),
 #            week = week - lag,
 #            pred_n_scale = pred_n*scale) -> temp
-#   sims_scale <- bind_rows(sims_scale, temp) 
+#   sims_scale <- bind_rows(sims_scale, temp)
 #   }
 #   return(sims_scale[-1,])
 # }
-
 lag_rescale <- function(scale, lag, sims){
   sims %>%
    mutate(week = week - lag,
@@ -357,16 +290,31 @@ ratio$CFR_obs[ratio$n_d < denom_cutoff | ratio$n_c < denom_cutoff] <- NA
 ratio %>% 
   summarise(n_d = sum(n_d, na.rm = TRUE),
             n_c = sum(n_c, na.rm = TRUE),
-            CFR_obs = median(CFR_obs, na.rm = TRUE)) %>%
+            med = median(CFR_obs, na.rm = TRUE),
+            q1 = quantile(CFR_obs, p = 0.25, na.rm = TRUE),
+            q3 = quantile(CFR_obs, p = 0.75, na.rm = TRUE)) %>%
   print()
 
 ratio %>% 
   group_by(period) %>%
   summarise(n_d = sum(n_d, na.rm = TRUE),
             n_c = sum(n_c, na.rm = TRUE),
-            CFR_obs = median(CFR_obs, na.rm = TRUE)) %>%
+            med = median(CFR_obs, na.rm = TRUE),
+            q1 = quantile(CFR_obs, p = 0.25, na.rm = TRUE),
+            q3 = quantile(CFR_obs, p = 0.75, na.rm = TRUE)) %>%
   print()
 
+
+ratio %>% 
+  group_by(geography,period) %>%
+  summarise(n_d = sum(n_d, na.rm = TRUE),
+            n_c = sum(n_c, na.rm = TRUE),
+            med = median(CFR_obs, na.rm = TRUE),
+            q1 = quantile(CFR_obs, p = 0.25, na.rm = TRUE),
+            q3 = quantile(CFR_obs, p = 0.75, na.rm = TRUE)) %>%
+  print()
+
+# Plot distribution of observed CFR
 CFR_obs <- ratio$CFR_obs[!is.na(ratio$CFR_obs) & ratio$period == 2]
 x <- 0:max(CFR_obs)
 hist(CFR_obs, breaks = 100, prob = T)
@@ -375,9 +323,12 @@ lines(x, EnvStats::demp(x, CFR_obs), col = "red")
 quants <- quantile(ratio$CFR_obs[ratio$period == 2], probs = scale_quants, na.rm = TRUE)
 quants
 
+# For each posterior sample, rescale by specified quantiles of the CFR distribution
 scaled_sims <- bind_rows(lapply(quants, lag_rescale, lag = lag, sims = sims)) %>%
+# scaled_sims <- lag_rescale(lag = lag, ratiodist = CFR_obs, sims = sims) %>%
   group_by(lad19nm, week) %>%
-  mutate(sim = row_number()) %>%
+  mutate(sim = row_number(),
+         lag = paste(lag/7,"weeks")) %>%
   ungroup() %>%
   rename(n_d = n) %>%
   left_join(dplyr::select(cases[["first"]], lad19nm, geography, week, n))
@@ -400,9 +351,10 @@ print(
     scale_x_date(limits = range(data$week)) +
     geom_point(aes(y = obs)) +
     facet_wrap(~lad19nm, scales = "free") +
-    labs(x = "",y = "Confirmed case count", title = "Reconstruction of confirmed cases from COVID-19-related deaths - four sampled LTLAs",
-         caption = paste0("Median and ",plot_quants[1]*100,"-",plot_quants[2]*100,
-                           "% quantiles over 1000 posterior simulations, scaled by ",
+    labs(x = "",y = "Confirmed case count", title = "Reconstruction of confirmed cases from COVID-19-related deaths",
+         subtitle = "Four sampled LTLAs",
+         caption = paste0("Median and ",(plot_quants[2]-plot_quants[1])*100,
+                           "% quantile interval over 1000 posterior simulations, scaled by ",
                           # samples_cfr, 
                           # "samples from",
                           min(scale_quants)*100,"% to ", max(scale_quants)*100,"% quantiles of",
@@ -432,9 +384,10 @@ print(
     scale_x_date(limits = range(data$week)) +
     geom_point(aes(y = obs)) +
     facet_wrap(~geography, scales = "free_y") +
-    labs(x = "",y = "Confirmed case count", title = "Reconstruction of confirmed cases from COVID-19-related deaths - by geography type",
-         caption = paste0("Median and ",plot_quants[1]*100,"-",plot_quants[2]*100,
-                           "% quantiles over 1000 posterior simulations, scaled by ",
+    labs(x = "",y = "Confirmed case count", title = "Reconstruction of confirmed cases from COVID-19-related deaths",
+         subtitle = "by geography type",
+         caption = paste0("Median and ",(plot_quants[2]-plot_quants[1])*100,
+                           "% quantile interval over 1000 posterior simulations, scaled by ",
                           # samples_cfr, 
                           # "samples from",
                           min(scale_quants)*100,"% to ", max(scale_quants)*100, "% quantiles of",
@@ -448,18 +401,21 @@ return(scaled_sims)
 }
 
 scale_quants <- seq(0.1,0.9,0.1)
-plot_quants <- c(0.1,0.9)
+plot_quants <- c(0.05,0.95)
 
+scaled_sims0 <- reconstruct(sims = dat_sims, data = dat, lag = 0, scale_quants = scale_quants, plot_quants = plot_quants, suffix = "avgcov")
 scaled_sims7 <- reconstruct(sims = dat_sims, data = dat, lag = 7, scale_quants = scale_quants, plot_quants = plot_quants, suffix = "avgcov")
 scaled_sims14 <- reconstruct(sims = dat_sims, data = dat, lag = 14, scale_quants = scale_quants, plot_quants = plot_quants, suffix = "avgcov")
+scaled_sims21 <- reconstruct(sims = dat_sims, data = dat, lag = 21, scale_quants = scale_quants, plot_quants = plot_quants, suffix = "avgcov")
 
+lagcomp <- bind_rows(scaled_sims0, scaled_sims7, scaled_sims14)
 
-## Total cases per week - two lags
-scaled_sims7 %>%
-  group_by(week, sim) %>%
+png(here::here("figures","compare","expanded","reconstr_totals.png"), height = 1200, width = 2800, res = 250)
+lagcomp %>%
+  group_by(lag, week, sim) %>%
   summarise(pred_n_scale = sum(pred_n_scale, na.rm = TRUE),
             cases = sum(n, na.rm = TRUE)) %>%
-  group_by(week) %>%
+  group_by(lag,week) %>%
   summarise(low = quantile(pred_n_scale, plot_quants[1], na.rm = TRUE),
             med = quantile(pred_n_scale, 0.5, na.rm = TRUE),
             high = quantile(pred_n_scale, plot_quants[2], na.rm = TRUE),
@@ -469,40 +425,20 @@ scaled_sims7 %>%
   geom_line(aes(y = med), col = "steelblue") +
   scale_x_date() +
   geom_point(aes(y = cases)) +
-  labs(x = "",y = "Confirmed case count", title = "Reconstruction of confirmed cases from COVID-19-related deaths across England",
-       subtitle = "1 week lag") +
-  theme_minimal() -> reconstr_total7
-
-scaled_sims14 %>%
-  group_by(week, sim) %>%
-  summarise(pred_n_scale = sum(pred_n_scale, na.rm = TRUE),
-            cases = sum(n, na.rm = TRUE)) %>%
-  group_by(week) %>%
-  summarise(low = quantile(pred_n_scale, plot_quants[1], na.rm = TRUE),
-            med = quantile(pred_n_scale, 0.5, na.rm = TRUE),
-            high = quantile(pred_n_scale, plot_quants[2], na.rm = TRUE),
-            cases = unique(cases, na.rm = TRUE)) %>%
-  ggplot(aes(week)) + 
-  geom_ribbon(aes(ymin = low, ymax = high), alpha = 0.2, fill = "steelblue") +
-  geom_line(aes(y = med), col = "steelblue") +
-  scale_x_date() +
-  geom_point(aes(y = cases)) +
-  labs(x = "",y = "", title = "",
-       subtitle = "2 week lag",
-       caption = paste0("Median and ",plot_quants[1]*100,"-",plot_quants[2]*100,
-                        "% quantiles over 1000 posterior simulations, scaled by ",
+  facet_wrap(~lag) +
+  labs(x = "",y = "", title = "Reconstruction of confirmed cases from COVID-19-related deaths across England",
+       subtitle = "Comparison of assumed lags between case confirmation and death",
+       caption = paste0("Median and ",(plot_quants[2]-plot_quants[1])*100,
+                        "% quantile interval over 1000 posterior simulations, scaled by ",
                         # samples_cfr, 
-                        "samples",
-                        # min(scale_quants)*100,"% to ", max(scale_quants)*100, "% quantiles",
+                        # "samples",
+                        min(scale_quants)*100,"% to ", max(scale_quants)*100, "% quantiles",
                         " from the observed CFR distribution post-P2 expansion.")) +
-  theme_minimal() -> reconstr_total14
-
-png(here::here("figures","compare","expanded","reconstr_totals.png"), height = 800, width = 2000, res = 150)
-reconstr_total7 + reconstr_total14
+  theme_minimal() 
 dev.off()
 
 ## Total cases overall
-scaled_sims14 %>%
+scaled_sims7 %>%
   group_by(sim) %>%
   summarise(pred_n_scale = sum(pred_n_scale, na.rm = TRUE),
             cases = sum(n, na.rm = TRUE)) %>%
@@ -523,7 +459,7 @@ totals %>%
   as.data.frame()
 
 ## By geography
-scaled_sims14 %>%
+scaled_sims7 %>%
   group_by(geography, sim) %>%
   summarise(pred_n_scale = sum(pred_n_scale, na.rm = TRUE),
             cases = sum(n, na.rm = TRUE)) %>%
@@ -542,7 +478,7 @@ geog_totals %>%
 # ---------------------------------------------------------------------------- #
 
 # Map out the median differences
-scaled_sims14 %>%
+scaled_sims7 %>%
   group_by(lad19cd, sim) %>%
   summarise(pred_n_scale = sum(pred_n_scale, na.rm = TRUE),
             cases = sum(n, na.rm = TRUE)) %>%
@@ -550,73 +486,24 @@ scaled_sims14 %>%
   summarise(med = quantile(pred_n_scale, 0.5, na.rm = TRUE),
             cases = unique(cases, na.rm = TRUE)) %>%
   ungroup() %>% 
-  mutate(perc_diff = (med - cases)*100/cases) -> scale_by_la
+  mutate(ratio = (med/cases)) -> scale_by_la
 
-summary(scale_by_la$perc_diff)
+summary(scale_by_la$ratio)
 
 scale_by_la %>%
-  summarise(low = quantile(perc_diff, plot_quants[1], na.rm = TRUE),
-            med = quantile(perc_diff, 0.5, na.rm = TRUE),
-            high = quantile(perc_diff, plot_quants[2], na.rm = TRUE)) %>%
+  summarise(low = quantile(ratio, plot_quants[1], na.rm = TRUE),
+            med = quantile(ratio, 0.5, na.rm = TRUE),
+            high = quantile(ratio, plot_quants[2], na.rm = TRUE)) %>%
   as.data.frame()
   
-
-
-
-png(here::here("figures","compare","expanded","underascertainment_lag_14.png"), height = 1000, width = 1500, res = 150)
+png(here::here("figures","compare","expanded","underascertainment_lag_7.png"), height = 1500, width = 2000, res = 250)
 regions %>%
   full_join(scale_by_la) %>%
-  basic_map(fill = "ratio") + 
-  scale_fill_gradient2(midpoint = 0, trans = "log2") +
-  labs(fill = "Ratio", title = "Relative difference between inferred total cases and observed test positives",
-       subtitle = paste0("Predicted deaths back-dated by two weeks"))
+  basic_map(fill = "ratio", plot.border = T) + 
+  scale_fill_gradient2(midpoint = 0, trans = "log2") + 
+  labs(fill = "Ratio", title = "Relative difference between median inferred total cases\nand observed test positives",
+       subtitle = paste0("Predicted deaths back-dated by one week"))
 dev.off()
 
-
-# 
-# 
-# CFR <- ratio$CFR_obs[!is.na(ratio$CFR_obs)]
-# hist(CFR, breaks = 40, prob = T)
-# lines(dgamma(seq(0,10,0.1), shape = 4, scale = 1/8))
-# lines(dexp(seq(0,10,0.1), rate = 7))
-# 
-# fitdistrplus::descdist(CFR)
-# fitgam <- fitdistrplus::fitdist(log(CFR), distr = "gamma", lower = c(0, 0), start = list(shape = 3, rate = 4))
-# 
-# fitweib <- fitdistrplus::fitdist(ratio$CFR_obs, distr = "weibull", lower = c(0, 0), start = list(shape = 3, scale = 1/10))
-# fitexp <- fitdistrplus::fitdist(ratio$CFR_obs, distr = "exp")
-# fitbeta <- fitdistrplus::fitdist(CFR, distr = "beta", lower = c(0,0), start = list(shape1 = 0.5, shape2 = 0.5)) 
-# 
-
-
-# hist(ratio$CFR_obs, breaks = 100, prob = TRUE)
-# lines(dgamma(seq(0,10,0.1), shape = fitgam$estimate[1], rate = fitgam$estimate[2]), col = "orange")
-# lines(dgamma(seq(0,10,0.1), shape = 1, scale = 0.1), col = "red")
-# lines(dweibull(seq(0,10,0.1), shape = fitweib$estimate[1], scale = fitweib$estimate[2]), col = "green")
-# lines(dexp(seq(0,10,0.1), rate = fitexp$estimate[1]), col = "blue")
-
-
-# ---------------------------------------------------------------------------- #
-## Mean fitted value + HPD interval ##
-# 
-# get_hpd <- function(marg){
-#   hpd <- as.data.frame(t(
-#     # extract hpd for each value of the variable
-#     sapply(marg, 
-#            FUN = function(m) inla.hpdmarginal(0.98, m))))
-#   hpd <- setNames(hpd, c("low","high"))
-#   return(hpd)
-# }
-# 
-# hpd.fit <- get_hpd(fit_pred$marginals.fitted.values)
-# dat_pred <- bind_cols(dat_pred, hpd.fit) %>%
-#   mutate(mean.fit = fit_pred$summary.fitted.values$mean)
-# 
-# 
-# dat_pred %>%
-#   slice(-1:-4499) %>%
-#   filter(la %in% 1:4) %>%
-#   ggplot(aes(week, mean.fit)) +
-#   geom_ribbon(aes(ymin = low, ymax = high), fill = "red", alpha = 0.2) +
-#   geom_line(col = "red") +
-#   facet_wrap(~lad19nm)
+###############################################################################
+###############################################################################
