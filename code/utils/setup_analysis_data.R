@@ -25,27 +25,38 @@ la_pops <- calc_E(alldata_sub)
 
 # --------------------------------------------------------------------------------------------#
 
-## Aggregate linelist by week and LA
+# Set up data with LTLA chars for each week in period
+ltla_first <- alldata_sub %>%
+  dplyr::select(lad19cd, ltla_first) %>%
+  unique()
+#   
+# week_seq <- ymd(seq(min(alldata_sub$week), max(alldata_sub$week), by = "week"))
+# expand <- data.frame(week = rep(week_seq, n_distinct(alldata_sub$lad19cd)),
+#                       lad19cd = rep(unique(alldata_sub$lad19cd), each = length(week_seq))) %>%
+#   full_join(ltla_first) %>%
+#   mutate(w = as.integer(lubridate::week(week))) %>%
+#   left_join(la_pops)
 
+## Aggregate linelist by week and LA
 alldata_sub %>%
-  group_by(lad19cd, week, ltla_first) %>%
+  group_by(lad19cd, week) %>%
   count() %>%
   ungroup() %>%
-  full_join(la_pops) %>% 
+  # full_join(expand) %>% 
+  full_join(ltla_first) %>%
+  left_join(la_pops) %>%
   mutate(n = replace_na(n, 0),
-         w = as.integer(lubridate::week(week)),
-         SIR_wk = n/la_wk_E,
-         SIR_wk_grp = cut(SIR_wk, breaks = 5, include.lowest = T, ordered_result = T)) -> d_agg_wk
+         w = as.integer(lubridate::week(week))) %>%
+  arrange(lad19cd, week) -> d_agg_wk
+
 
 # Aggregate by LA overall
 alldata_sub %>%
   group_by(lad19cd, ltla_first) %>%
   count(name = "n_total") %>%
   full_join(la_pops) %>%
-  mutate(n_total = replace_na(n_total, 0),
-         SIR = n_total/la_tot_E) %>%
-  ungroup() %>%
-  mutate(SIR_grp = cut(SIR, breaks = 5, include.lowest = T, ordered_result = T)) -> d_agg_tot
+  mutate(n_total = replace_na(n_total, 0)) %>%
+  ungroup() -> d_agg_tot
 
 
 # --------------------------------------------------------------------------------------------#
@@ -77,7 +88,7 @@ dat$la <- dat %>%
   group_by(lad19cd) %>%
   group_indices()
 
-saveRDS(dat, paste0(datadir,sprintf("/by_week_la/dat_%s_%s_%s.rds",measure,start,end)))
+saveRDS(dat, paste0(datadir,sprintf("/dat_%s_%s_%s.rds",measure,start,end)))
 
 return(dat)
 

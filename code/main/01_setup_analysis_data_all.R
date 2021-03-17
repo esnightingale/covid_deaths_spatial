@@ -7,6 +7,7 @@
 ################################################################################
 
 library(tidyverse)
+library(lubridate)
 
 # Local data directory
 datadir <- "C:/Users/phpuenig/Documents/COVID-19/Data/"
@@ -20,9 +21,6 @@ regions <- readRDS(paste0(datadir,"maps/LA_shp_wpops.rds")) %>%
 regions.df <- st_drop_geometry(regions)
 
 list.files(here::here("code","utils"), full.names = TRUE) %>% walk(source)
-
-# source(here::here("code","main","01_calculate_E.R"))
-# source(here::here("code","main","01_setup_analysis_data.R"))
 
 
 ## DEATHS ##

@@ -26,7 +26,6 @@ join_city <- function(d){
   return(d)
 }
 
-datadir <- "~/COVID-19/Data/"
 pops_raw <- readxl::read_xls(paste0(datadir,"populations/ukmidyearestimates20192020ladcodes.xls"), 
                      sheet = "MYE2 - Persons",
                      skip = 4) 
@@ -47,7 +46,7 @@ female <- readxl::read_xls(paste0(datadir,"populations/ukmidyearestimates2019202
 
 ################################################################################
 
-rmv_rows <- min(which(rowSums(!is.na(pops_raw)) == 0)):nrow(pops_raw) # rows with exactly 0 non-missing entries
+rmv_rows <- min(which(rowSums(!is.na(pops_raw)) == 0)):nrow(pops_raw) # Note rows with exactly 0 non-missing entries
 pops <- pops_raw[-rmv_rows,]  
 
 # Calculate average population age
