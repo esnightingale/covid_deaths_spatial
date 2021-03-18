@@ -58,13 +58,13 @@ kw$prop_kw[kw$lad19nm == "Westminster"] <- median(kw$prop_kw[kw$lad19nm %in% reg
 
 
 ## Index of multiple deprivation
-imd <- read.csv(paste0(datadir,"covariates/imd.csv"), header = T) %>%
-  mutate(lad19nm = as.character(lad19nm))
+imd <- read.csv(paste0(datadir,"covariates/Indices_of_Multiple_Deprivation_(IMD)_2019.csv"), header = T) %>%
+  mutate(lad19nm = as.character(LADnm))
 imd$lad19nm[imd$lad19nm %in% c("Aylesbury Vale","Chiltern", "South Bucks", "Wycombe")] <- "Buckinghamshire"
 
 imd <- imd %>% 
   group_by(lad19nm) %>% 
-  summarise(IMD = mean(IMD))
+  summarise(IMD = median(IMDScore))
 
 
 ## Ethnicity 

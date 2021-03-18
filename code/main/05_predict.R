@@ -341,7 +341,7 @@ scaled_quants <- scaled_sims %>%
             obs = unique(n))
 
 la_samp <- sample(scaled_quants$lad19nm, size =  4)
-# png(here::here("figures","compare","expanded",paste0("reconstr_lasamp_lag_",lag,"_",suffix,".png")), height = 1000, width = 1500, res = 150)
+png(here::here("figures","compare","expanded",paste0("reconstr_lasamp_lag_",lag,"_",suffix,".png")), height = 1000, width = 1500, res = 150)
 print(
   scaled_quants %>%
     filter(lad19nm %in% la_samp) %>% #View()
@@ -363,7 +363,7 @@ print(
          ) +
     theme_minimal()
 )
-# dev.off()
+dev.off()
 
 scaled_quants_geog <- scaled_sims %>%
   group_by(geography, week, sim) %>%
@@ -375,7 +375,7 @@ scaled_quants_geog <- scaled_sims %>%
             high = quantile(pred_n_scale, plot_quants[2]),
             obs = unique(cases, na.rm = TRUE)) 
 
-# png(here::here("figures","compare","expanded",paste0("reconstr_geog_lag_",lag,"_",suffix,".png")), height = 1000, width = 1500, res = 150)
+png(here::here("figures","compare","expanded",paste0("reconstr_geog_lag_",lag,"_",suffix,".png")), height = 1000, width = 1500, res = 150)
 print(
   scaled_quants_geog %>%
     ggplot(aes(week)) + 
@@ -394,7 +394,7 @@ print(
                           " the observed CFR distribution post-P2 expansion.")) +
     theme_minimal()
 )
-# dev.off()
+dev.off()
 
 return(scaled_sims)
 
