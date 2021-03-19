@@ -34,6 +34,7 @@ dat$n[dat$wk_since_first < 0] <- NA
 
 n.la <- n_distinct(dat$la)
 period <- dat_all$breaks[[wave]]
+nsims <- 10000
 
 # Fitted models and posterior samples
 fits <- readRDS(file = here::here("output","expanded_data",
@@ -87,6 +88,8 @@ prior.prec.tp
 #   PREDICTION AT ALL TIME POINTS    #
 ######################################
 
+samples_final <- inla.posterior.sample(fit_final, n = nsims)
+
 sims <- bind_cols(lapply(samples_final, get_preds, dat))
 dat_sims <- dat %>%
   dplyr::select(geography, lad19cd, lad19nm, la, la_pop, week, E_wk) %>%
@@ -110,7 +113,7 @@ dat_sims %>%
   ggplot() + 
   geom_line(aes(week, pred*1e5/pop, group = name), alpha = 0.1, col = "grey") +
   geom_point(aes(week, n*1e5/pop)) + 
-  labs(x = "Calendar week", y = "Rate per 100,000", title = "Total fit over time, by calendar week", subtitle = "Observed rates shown in black, with 1000 posterior samples in grey") -> plot_fit_time
+  labs(x = "Calendar week", y = "Rate per 100,000", title = "Total fit over time, by calendar week", subtitle = "Observed rates shown in black, with ", nsims, " posterior samples in grey") -> plot_fit_time
 
 dat_sims %>%
   group_by(week, name, geography) %>%
@@ -128,7 +131,7 @@ by_samp_geog %>%
 ggplot(by_samp_geog) + 
   geom_line(aes(week, pred*1e5/pop, group = group, col = geography), alpha = 0.1) +
   geom_point(dat = by_geog, aes(week, n*1e5/pop, col = geography), pch = 21, fill = "white") + 
-  labs(x = "Calendar week", y = "Rate per 100,000", title = "Total fit over time, by calendar week and geography", subtitle = "Observed rates shown in white, with 1000 posterior samples", col = "Geography") +
+  labs(x = "Calendar week", y = "Rate per 100,000", title = "Total fit over time, by calendar week and geography", subtitle = "Observed rates shown in white, with ", nsims, " posterior samples", col = "Geography") +
   theme(legend.position = c(0.2,0.7))  -> plot_fit_time_geog
 
 png(here::here("figures",measure,"temp_fit_alltps.png"), height = 1000, width = 1500, res = 150)
@@ -182,7 +185,7 @@ fit_pred <- INLA::inla(f,
 summary(fit_pred)
 
 # Samples are of *marginal* densities
-samples_pred <- inla.posterior.sample(n = 1000, fit_pred)
+samples_pred <- inla.posterior.sample(n = nsims, fit_pred)
 
 saveRDS(list(fit = fit_pred, samples = samples_pred), file = here::here("output","fit_samples_expanded_avgcov.rds"))
 
@@ -354,7 +357,7 @@ print(
     labs(x = "",y = "Confirmed case count", title = "Reconstruction of confirmed cases from COVID-19-related deaths",
          subtitle = "Four sampled LTLAs",
          caption = paste0("Median and ",(plot_quants[2]-plot_quants[1])*100,
-                           "% quantile interval over 1000 posterior simulations, scaled by ",
+                           "% quantile interval over ", nsims, " posterior simulations, scaled by ",
                           # samples_cfr, 
                           # "samples from",
                           min(scale_quants)*100,"% to ", max(scale_quants)*100,"% quantiles of",
@@ -387,7 +390,7 @@ print(
     labs(x = "",y = "Confirmed case count", title = "Reconstruction of confirmed cases from COVID-19-related deaths",
          subtitle = "by geography type",
          caption = paste0("Median and ",(plot_quants[2]-plot_quants[1])*100,
-                           "% quantile interval over 1000 posterior simulations, scaled by ",
+                           "% quantile interval over ", nsims, " posterior simulations, scaled by ",
                           # samples_cfr, 
                           # "samples from",
                           min(scale_quants)*100,"% to ", max(scale_quants)*100, "% quantiles of",

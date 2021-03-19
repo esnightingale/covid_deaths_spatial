@@ -160,20 +160,31 @@ get_preds <- function(sample,dat){
   pred <- sample$latent[1:nrow(dat)]
 }
 
-## PLOT MODEL SUMMARY ##
-plot.model <- function(m){
-  p <- autoplot(m)
-  print(
-    cowplot::plot_grid(plotlist = p)
-  )
-}
 
-plot.resids <- function(m){
-  p1 <- ggplot_inla_residuals(m, dat$SMR, binwidth = 0.1)
-  p2 <- ggplot_inla_residuals2(m, dat$SMR, se = TRUE)
-  return(list(p1, p2))
+# For each simulated trajectory, scale by a sampled CFR from the observed empirical distribution post-P2
+# lag_rescale <- function(lag, ratiodist, sims, nsamp = 1){
+# 
+#   sims_scale <- sims[1,]
+#   for (i in 1:nsamp){
+#   sims %>%
+#     group_by(name) %>%
+#     mutate(scale = EnvStats::remp(1, ratiodist),
+#            week = week - lag,
+#            pred_n_scale = pred_n*scale) -> temp
+#   sims_scale <- bind_rows(sims_scale, temp)
+#   }
+#   return(sims_scale[-1,])
+# }
+lag_rescale <- function(scale, lag, sims){
+  
+  setDT(sims)
+  sims_scale <- sims[,week := week - lag]
+  sims_scale <- sims_scale[, pred_n_scale := pred_n*scale]
+  # sims %>%
+  #   mutate(week = week - lag,
+  #          pred_n_scale = pred_n*scale) -> sims_scale
+  return(sims_scale)
 }
-
 # 
 # get_resid <- function(fit){
 #   dat %>% 

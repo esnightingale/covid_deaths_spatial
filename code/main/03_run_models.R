@@ -16,6 +16,7 @@ library(tidyverse)
 measure <- "deaths"
 expected <- "E"
 wave <- 1
+nsims <- 100000
 
 list.files(here::here("code","utils"), full.names = TRUE) %>% walk(source)
 
@@ -185,7 +186,7 @@ saveRDS(fits, file = here::here("output/expanded_data",sprintf("fits_%s_%s.rds",
 
 
 # ## Draw posterior samples ##
-samples <- lapply(fits, inla.posterior.sample,n = 1000)
+samples <- lapply(fits, inla.posterior.sample,n = nsims)
 saveRDS(samples, file =  here::here("output/expanded_data",sprintf("samples_%s_%s.rds",measure, wave)))
 
 # Just final model
