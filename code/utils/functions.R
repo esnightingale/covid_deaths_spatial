@@ -11,7 +11,8 @@
 ## MAP PLOT ##
 map_theme <- function () {
   theme_minimal() +
-    theme(axis.title=element_blank(),
+    theme(panel.grid = element_blank(),
+          axis.title=element_blank(),
           axis.text=element_blank(),
           axis.ticks=element_blank(),
           legend.position = c(0.1,0.5)) 
@@ -45,52 +46,6 @@ basic_map <- function(sf, fill, rate1e5 = F, plot.border = F, scale = T){
 
   return(p)
 }
-
-map_w_trans <- function(sf, fill, alpha, rate1e5 = F){
-  
-  if (rate1e5 == T){
-    sf <- mutate(sf, fill = !!sym(fill)*1e5/la_pop)
-  }else{sf <- mutate(sf, fill = !!sym(fill))}
-  
-  p <- ggplot(sf, aes(geometry = geometry, fill = fill, alpha = !!sym(alpha))) +
-    geom_sf() +
-    scale_fill_viridis_c() +
-    labs(fill = "") +
-    annotation_scale(location = "br") +
-    map_theme() 
-  # annotation_north_arrow(location = "tl", which_north = "true", 
-  #     # pad_x = unit(0.75, "in"), pad_y = unit(0.5, "in"),
-  #     style = north_arrow_fancy_orienteering) 
-  return(p)
-}
-
-
-
-map_wlondon <- function(sf, fill, rate1e5 = F){
-  
-  if (rate1e5 == T){
-    sf <- mutate(sf, fill = !!sym(fill)*1e5/la_pop)
-  }else{sf <- mutate(sf, fill = !!sym(fill))}
-  
-  london <- filter(sf, geography == "London borough")
-  
-  p <- ggplot(sf, aes(geometry = geometry, fill = fill)) +
-    geom_sf() +
-    scale_fill_viridis_c() +
-    labs(fill = "") +
-    annotation_scale(location = "br") +
-    map_theme() 
-  
-  p_sub <- ggplot(london, aes(geometry = geometry, fill = fill)) +
-    geom_sf() +
-    scale_fill_viridis_c() +
-    labs(fill = "") +
-    annotation_scale(location = "br") +
-    map_theme() 
-  
-  return(p + p_sub)
-}
-
 
 ## INLA MODEL SPECIFICATION ##
 fit_mod <- function(f, dat, expected = "E", family = "nbinomial"){
@@ -155,6 +110,22 @@ pit_hist <- function(fit, bins = 30){
   )
 }
 
+print_coeffs <- function(m){
+  exp(m$summary.fixed)
+}
+
+transform_coeff <- function(marg){
+  emarg <- inla.tmarginal(exp, marg)
+  zmarg <- inla.zmarginal(emarg, silent = T)
+  summ.coeff <- setNames(t(zmarg), names(zmarg))
+  return(summ.coeff)
+}
+
+get_coeffs <- function(fit){
+  coeftab <- purrr::map_dfr(fit$marginals.fixed, transform_coeff) %>%
+    mutate(effect = names(fit$marginals.fixed), .before = everything())
+  return(coeftab)
+}
 
 get_preds <- function(sample,dat){
   pred <- sample$latent[1:nrow(dat)]
@@ -177,39 +148,12 @@ get_preds <- function(sample,dat){
 # }
 lag_rescale <- function(scale, lag, sims){
   
-  setDT(sims)
-  sims_scale <- sims[,week := week - lag]
-  sims_scale <- sims_scale[, pred_n_scale := pred_n*scale]
-  # sims %>%
-  #   mutate(week = week - lag,
-  #          pred_n_scale = pred_n*scale) -> sims_scale
+  # setDT(sims)
+  # sims_scale <- sims[,week := week - lag]
+  # sims_scale <- sims_scale[, pred_n_scale := pred_n*scale]
+  sims %>%
+    mutate(week = week - lag,
+           pred_n_scale = pred_n*scale,
+           scale = scale) -> sims_scale
   return(sims_scale)
 }
-# 
-# get_resid <- function(fit){
-#   dat %>% 
-#     mutate(mu = fit$summary.fitted.values$mean,
-#            sigma2 = mu*(1 + mu/fit$summary.hyperpar[1,"mean"]),
-#            resid = (SMR-mu)/sqrt(sigma2),
-#            MSqE = (SMR-mu)^2,
-#            logs = log(fit$cpo$cpo)) 
-# }
-# 
-# resids <- lapply(fits, function(fit) get_resid(fit)$resid) %>%
-#   bind_cols() %>%
-#   setNames(unlist(names(fits)))
-# 
-# dat_resid <- bind_cols(dat, resids) 
-# 
-# png(here("figures","final_altdata","map_resids.png"), height = 800, width = 1200, res = 150)
-# # tiff(filename = "./figures/final_altdata/map_resids.tif", height = 600, width = 1000)
-# dat_resid %>%
-#   pivot_longer(cols = base:BYM_geog) %>%
-#   group_by(lad19cd, name) %>%
-#   summarise(value = mean(value)) %>% 
-#   left_join(regions) %>%
-#   basic_map(fill = "value") +
-#   # scale_fill_viridis_c(trans = "log10") +
-#   facet_wrap(~name, ncol = 3, nrow = 2) +
-#   labs(title = "Mean Squared Error per local authority")
-# dev.off()

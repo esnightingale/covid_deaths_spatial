@@ -1,8 +1,10 @@
 ################################################################################
-# Description: Summarise and visualise model output
+# Description: Fit and draw samples from prediction model, for fitted values
+# and predicted with average covariates.
+# 
 # 
 # Author: Emily S Nightingale
-# Date created: 30/09/2020
+# Date created: 18/03/2021
 # 
 ################################################################################
 ################################################################################
@@ -17,11 +19,6 @@ list.files(here::here("code","utils"), full.names = TRUE) %>% walk(source)
 measure <- "deaths"
 wave <- 1
 
-## Shapefiles
-regions <- readRDS(paste0(datadir,"maps/LA_shp_wpops.rds")) %>%
-  filter(grepl("E", lad19cd))
-border <- st_union(regions)
-
 # Neighbourhood graph
 g <- inla.read.graph(filename = paste0(datadir,"maps/regions_eng.adj"))
 
@@ -34,7 +31,7 @@ dat$n[dat$wk_since_first < 0] <- NA
 
 n.la <- n_distinct(dat$la)
 period <- dat_all$breaks[[wave]]
-nsims <- 10000
+nsims <- 1000
 
 # Fitted models and posterior samples
 fits <- readRDS(file = here::here("output","expanded_data",
@@ -43,8 +40,6 @@ fit_final <- fits[[6]]
 samples <- readRDS(file = here::here("output","expanded_data",
                                      sprintf("samples_%s_%s.rds",measure, wave)))
 samples_final <- samples[[6]]
-
-cases <- readRDS(here::here("data","expanded","cases.rds"))
 
 # ---------------------------------------------------------------------------- #
 ######################
@@ -56,7 +51,7 @@ cases <- readRDS(here::here("data","expanded","cases.rds"))
 # SD over time
 dat %>%
   group_by(w) %>%
-  summarise(n = sum(n), E = sum(E_wk)) %>%
+  summarise(n = sum(n, na.rm = TRUE), E = sum(E_wk)) %>%
   mutate(rate = n/E) %>%
   pull(rate) %>%
   var() %>%
@@ -65,7 +60,7 @@ dat %>%
 # SD over space
 dat %>%
   group_by(lad19cd) %>%
-  summarise(n = sum(n), E = unique(E_wk)) %>%
+  summarise(n = sum(n, na.rm = TRUE), E = unique(E_wk)) %>%
   mutate(rate = n/E) %>%
   pull(rate) %>%
   var() %>%
@@ -90,54 +85,79 @@ prior.prec.tp
 
 samples_final <- inla.posterior.sample(fit_final, n = nsims)
 
-sims <- bind_cols(lapply(samples_final, get_preds, dat))
-dat_sims <- dat %>%
-  dplyr::select(geography, lad19cd, lad19nm, la, la_pop, week, E_wk) %>%
-  bind_cols(sims) 
+sims <- as.data.table(bind_cols(lapply(samples_final, get_preds, dat)))
 
-dat_sims <-  dat %>%
-  dplyr::select(lad19cd, week, n) %>% 
-  full_join(dat_sims) %>% 
-  arrange(geography,lad19cd, week) %>%
-  pivot_longer(cols = -1:-8) %>%
-  mutate(pred = exp(value),
-         pred_n = exp(value)*E_wk,
-         n = replace_na(n, 0))
+setDT(dat)
+dat_sims <-  dplyr::bind_cols(dat[,.(geography, lad19cd, lad19nm, la, la_pop, week, E_wk, n)], 
+                              sims)
 
+dat_sims_long <- reshape2::melt(
+  dat_sims, 
+  id.vars = 1:9)
 
-dat_sims %>%
-  group_by(week, name) %>%
-  summarise(pred = sum(pred_n),
-            n = sum(n),
-            pop = sum(la_pop)) %>%
-  ggplot() + 
-  geom_line(aes(week, pred*1e5/pop, group = name), alpha = 0.1, col = "grey") +
-  geom_point(aes(week, n*1e5/pop)) + 
-  labs(x = "Calendar week", y = "Rate per 100,000", title = "Total fit over time, by calendar week", subtitle = "Observed rates shown in black, with ", nsims, " posterior samples in grey") -> plot_fit_time
+dat_sims_long <- dat_sims_long[, pred := exp(value)]
+dat_sims_long <- dat_sims_long[, pred_n := exp(value)*E_wk]
 
-dat_sims %>%
-  group_by(week, name, geography) %>%
-  summarise(pred = sum(pred_n),
-            n = sum(n),
-            pop = sum(la_pop)) %>%
-  mutate(group = paste0(name, geography)) -> by_samp_geog
-by_samp_geog %>%
-  group_by(week, geography) %>%
-  summarise(pred = mean(pred),
-            n = mean(n),
-            pop = mean(pop)) -> by_geog
+dat_plot_tot <- dat_sims_long[,.(pred_n = sum(pred_n), 
+                                  obs = sum(n, na.rm = T), 
+                                  pop = sum(la_pop)), by = .(week, variable)] 
 
+dat_plot_geog <- dat_sims_long[,.(pred_n = sum(pred_n), 
+                                  obs = sum(n, na.rm = T), 
+                                  pop = sum(la_pop)), by = .(week, variable, geography)] 
+dat_plot_geog <- dat_plot_geog[, group := paste(variable, geography)]
 
-ggplot(by_samp_geog) + 
-  geom_line(aes(week, pred*1e5/pop, group = group, col = geography), alpha = 0.1) +
-  geom_point(dat = by_geog, aes(week, n*1e5/pop, col = geography), pch = 21, fill = "white") + 
-  labs(x = "Calendar week", y = "Rate per 100,000", title = "Total fit over time, by calendar week and geography", subtitle = "Observed rates shown in white, with ", nsims, " posterior samples", col = "Geography") +
+ggplot(setDT(dat_plot_tot)) + 
+  geom_line(aes(week, pred_n*1e5/pop, group = variable), alpha = 0.1, col = "grey") +
+  geom_point(aes(week, obs*1e5/pop)) + 
+  labs(x = "Calendar week", y = "Rate per 100,000", title = "Total fit over time, by calendar week", subtitle = paste0("Observed rates shown in black, with ", nsims, " posterior samples in grey")) -> plot_fit_time
+
+ggplot(setDT(dat_plot_geog)) + 
+  geom_line(aes(week, pred_n*1e5/pop, group = group, col = geography), alpha = 0.1) +
+  geom_point(aes(week, obs*1e5/pop, col = geography), pch = 21, fill = "white") + 
+  labs(x = "Calendar week", y = "Rate per 100,000", title = "Total fit over time, by calendar week and geography", subtitle = paste0("Observed rates shown in white, with ", nsims, " posterior samples"), col = "Geography") +
   theme(legend.position = c(0.2,0.7))  -> plot_fit_time_geog
 
-png(here::here("figures",measure,"temp_fit_alltps.png"), height = 1000, width = 1500, res = 150)
+png(here::here("figures",measure,"temp_fit_all.png"), height = 1000, width = 1500, res = 150)
 plot_fit_time / plot_fit_time_geog
 dev.off()
 
+agg_sims <- dat_sims_long[,.(q05 = quantile(pred_n, 0.05),
+                             q25 = quantile(pred_n, 0.25),
+                             q50 = quantile(pred_n, 0.5),
+                             q75 = quantile(pred_n, 0.75),
+                             q95 = quantile(pred_n, 0.95),
+                             obs = mean(n)),
+                          by = .(la, lad19cd, lad19nm, la_pop, geography, week)]
+
+calc_inc <- function(x) x*1e5/agg_sims$la_pop
+agg_sims_plot <- mutate(agg_sims, across(q05:obs, calc_inc))
+
+# ggplot(as.data.frame(agg_sims), aes(week, q50)) +
+#   geom_ribbon(aes(ymin = q01, ymax = q99), alpha = 0.5) +
+#   geom_ribbon(aes(ymin = q10, ymax = q90), alpha = 0.5) +
+#   geom_line() +
+#   facet_wrap(~lad19nm)
+
+la_samp <- sample(dat$lad19cd, 6)
+ggplot(as.data.frame(agg_sims), aes(x = week)) + #[lad19cd %in% la_samp]
+  geom_ribbon(aes(ymin = q05, ymax = q95), alpha = 0.2, fill = "steelblue") +
+  geom_ribbon(aes(ymin = q25, ymax = q75), alpha = 0.2, fill = "steelblue") +
+  geom_line(aes(y = q50), col = "steelblue") +
+  geom_point(aes(y = obs), cex = 0.5) + 
+  facet_wrap(~lad19nm, scales = "free") +
+  labs(x = "Calendar week", 
+       y = "Rate per 100,000", 
+       title = "Total fit over time, by calendar week", 
+       subtitle = paste0("Observed rates shown in black, with 50-90% quantiles over ", nsims, " posterior samples")) -> plot_fit_la
+
+png(here::here("figures",measure,"temp_fit_lasamp.png"), height = 1000, width = 1500, res = 150)
+plot_fit_la
+dev.off()
+
+pdf(here::here("figures",measure,"fit_all_ltlas.pdf"), height = 25, width = 25)
+plot_fit_la
+dev.off()
 
 # ---------------------------------------------------------------------------- #
 
@@ -145,9 +165,10 @@ dev.off()
 #  PREDICTION AT AVERAGE COVARIATES  #
 ######################################
 
-dat %>%
+setDF(dat) %>%
   mutate(prop_minority = median(prop_minority),
          IMD_quint = "(21.3,29.2]",
+         E_wk = E_wk_unstrat,
          n = NA)  -> dat_avgcov
 
 # Make pred data with average covariate values
@@ -188,325 +209,3 @@ summary(fit_pred)
 samples_pred <- inla.posterior.sample(n = nsims, fit_pred)
 
 saveRDS(list(fit = fit_pred, samples = samples_pred), file = here::here("output","fit_samples_expanded_avgcov.rds"))
-
-pred_avgcov <- readRDS(here::here("output","fit_samples_expanded_avgcov.rds"))
-fit_pred <- pred_avgcov$fit
-samples_pred <- pred_avgcov$samples
-
-# ---------------------------------------------------------------------------- #
-## Summarise samples by geography ##
-
-sims <- bind_cols(lapply(samples_pred, get_preds, dat_pred))
-idx <- -1:-nrow(dat) 
-
-dat_sims <- dat_pred %>%
-  dplyr::select(geography, lad19cd, lad19nm, la, la_pop, week, E_wk) %>%
-  bind_cols(sims) %>%
-  slice(idx)
-
-dat_sims <-  dat %>%
-  dplyr::select(lad19cd, week, n) %>% 
-  full_join(dat_sims) %>% 
-  arrange(geography,lad19cd, week) %>% 
-  pivot_longer(cols = -1:-8) %>%
-  mutate(pred = exp(value),
-         pred_n = exp(value)*E_wk)
-
-png(here::here("figures",measure,"expanded_data","pred_avgcov_geog.png"), height = 1000, width = 1200, res = 150)
-print(
-  dat_sims %>%
-    group_by(week, name, geography) %>%
-    summarise(pred_n = sum(pred_n),
-              obs = sum(n, na.rm = TRUE),
-              pop = sum(la_pop)) %>% 
-    ggplot() + 
-    geom_line(aes(week, pred_n*1e5/pop, group = name, col = geography), alpha = 0.05) +
-    geom_point(aes(week, obs*1e5/pop)) +
-    facet_wrap(~geography) + #
-    labs(y = "Rate per 100,000", x = "Week", title = "Predicted COVID-19-related deaths at median covariate values") +
-    guides(col = FALSE) +
-    theme_minimal()
-)
-dev.off()
-
-dat_sims %>%
-  group_by(la, lad19cd, lad19nm, la_pop, geography, week) %>%
-  summarise(q01 = quantile(pred_n, 0.01),
-            q10 = quantile(pred_n, 0.1),
-            q50 = quantile(pred_n, 0.5),
-            q90 = quantile(pred_n, 0.9),
-            q99 = quantile(pred_n, 0.99)) %>%
-  ungroup() -> agg_sims
-
-agg_sims %>%
-  filter(la %in% 1:4) %>%
-ggplot(aes(week, q50)) +
-  geom_ribbon(aes(ymin = q01, ymax = q99), alpha = 0.5) +
-  geom_ribbon(aes(ymin = q10, ymax = q90), alpha = 0.5) +
-  geom_line() +
-  facet_wrap(~lad19nm)
-
-write.csv(agg_sims, file = here::here("output","pred_quants_avgcov.csv"), row.names = F)
-
-
-# ---------------------------------------------------------------------------- #
-## Scale predictions by death:case ratio ##
-
-# lag <- 14
-
-# Function: for each simulated trajectory, scale by a sampled CFR from the observed empirical distribution post-P2
-# lag_rescale <- function(lag, ratiodist, sims, nsamp = 1){
-# 
-#   sims_scale <- sims[1,]
-#   for (i in 1:nsamp){
-#   sims %>%
-#     group_by(name) %>%
-#     mutate(scale = EnvStats::remp(1, ratiodist),
-#            week = week - lag,
-#            pred_n_scale = pred_n*scale) -> temp
-#   sims_scale <- bind_rows(sims_scale, temp)
-#   }
-#   return(sims_scale[-1,])
-# }
-lag_rescale <- function(scale, lag, sims){
-  sims %>%
-   mutate(week = week - lag,
-          pred_n_scale = pred_n*scale) -> sims_scale
-  return(sims_scale)
-}
-
-set.seed(101)
-reconstruct <- function(sims, data, lag, scale_quants, plot_quants, denom_cutoff = 1, suffix = ""){
-
-data %>%
-  mutate(n = replace_na(n, 0),
-         week = week-lag) %>%
-  full_join(dplyr::select(cases[["first"]],lad19cd,geography,week,n), by = c("lad19cd","week","geography"), suffix = c("_d","_c")) %>%
-  mutate(CFR_obs = n_c/n_d,
-         period = case_when(week < ymd("2020-05-18") ~ 1,
-                                   week >= ymd("2020-05-18") ~ 2),
-         ID = row_number()) -> ratio
-
-# Drop unstable ratios where denominator less than cutoff
-ratio$CFR_obs[ratio$n_d < denom_cutoff | ratio$n_c < denom_cutoff] <- NA
-
-ratio %>% 
-  summarise(n_d = sum(n_d, na.rm = TRUE),
-            n_c = sum(n_c, na.rm = TRUE),
-            med = median(CFR_obs, na.rm = TRUE),
-            q1 = quantile(CFR_obs, p = 0.25, na.rm = TRUE),
-            q3 = quantile(CFR_obs, p = 0.75, na.rm = TRUE)) %>%
-  print()
-
-ratio %>% 
-  group_by(period) %>%
-  summarise(n_d = sum(n_d, na.rm = TRUE),
-            n_c = sum(n_c, na.rm = TRUE),
-            med = median(CFR_obs, na.rm = TRUE),
-            q1 = quantile(CFR_obs, p = 0.25, na.rm = TRUE),
-            q3 = quantile(CFR_obs, p = 0.75, na.rm = TRUE)) %>%
-  print()
-
-
-ratio %>% 
-  group_by(geography,period) %>%
-  summarise(n_d = sum(n_d, na.rm = TRUE),
-            n_c = sum(n_c, na.rm = TRUE),
-            med = median(CFR_obs, na.rm = TRUE),
-            q1 = quantile(CFR_obs, p = 0.25, na.rm = TRUE),
-            q3 = quantile(CFR_obs, p = 0.75, na.rm = TRUE)) %>%
-  print()
-
-# Plot distribution of observed CFR
-CFR_obs <- ratio$CFR_obs[!is.na(ratio$CFR_obs) & ratio$period == 2]
-x <- 0:max(CFR_obs)
-hist(CFR_obs, breaks = 100, prob = T)
-lines(x, EnvStats::demp(x, CFR_obs), col = "red")
-
-quants <- quantile(ratio$CFR_obs[ratio$period == 2], probs = scale_quants, na.rm = TRUE)
-quants
-
-# For each posterior sample, rescale by specified quantiles of the CFR distribution
-scaled_sims <- bind_rows(lapply(quants, lag_rescale, lag = lag, sims = sims)) %>%
-# scaled_sims <- lag_rescale(lag = lag, ratiodist = CFR_obs, sims = sims) %>%
-  group_by(lad19nm, week) %>%
-  mutate(sim = row_number(),
-         lag = paste(lag/7,"weeks")) %>%
-  ungroup() %>%
-  rename(n_d = n) %>%
-  left_join(dplyr::select(cases[["first"]], lad19nm, geography, week, n))
-
-scaled_quants <- scaled_sims %>%
-  group_by(lad19nm,la, week) %>%
-  summarise(low = quantile(pred_n_scale, plot_quants[1], na.rm = TRUE),
-            med = quantile(pred_n_scale, 0.5, na.rm = TRUE),
-            high = quantile(pred_n_scale, plot_quants[2], na.rm = TRUE),
-            obs = unique(n))
-
-la_samp <- sample(scaled_quants$lad19nm, size =  4)
-png(here::here("figures","compare","expanded",paste0("reconstr_lasamp_lag_",lag,"_",suffix,".png")), height = 1000, width = 1500, res = 150)
-print(
-  scaled_quants %>%
-    filter(lad19nm %in% la_samp) %>% #View()
-    ggplot(aes(week)) + 
-    geom_ribbon(aes(ymin = low, ymax = high), alpha = 0.2, fill = "steelblue") +
-    geom_line(aes(y = med), col = "steelblue") +
-    scale_x_date(limits = range(data$week)) +
-    geom_point(aes(y = obs)) +
-    facet_wrap(~lad19nm, scales = "free") +
-    labs(x = "",y = "Confirmed case count", title = "Reconstruction of confirmed cases from COVID-19-related deaths",
-         subtitle = "Four sampled LTLAs",
-         caption = paste0("Median and ",(plot_quants[2]-plot_quants[1])*100,
-                           "% quantile interval over ", nsims, " posterior simulations, scaled by ",
-                          # samples_cfr, 
-                          # "samples from",
-                          min(scale_quants)*100,"% to ", max(scale_quants)*100,"% quantiles of",
-                          " the observed CFR distribution post-P2 expansion."
-                          )
-         ) +
-    theme_minimal()
-)
-dev.off()
-
-scaled_quants_geog <- scaled_sims %>%
-  group_by(geography, week, sim) %>%
-  summarise(pred_n_scale = sum(pred_n_scale, na.rm = TRUE),
-            cases = sum(n, na.rm = TRUE)) %>%
-  group_by(geography, week) %>%
-  summarise(low = quantile(pred_n_scale, plot_quants[1]),
-            med = quantile(pred_n_scale, 0.5),
-            high = quantile(pred_n_scale, plot_quants[2]),
-            obs = unique(cases, na.rm = TRUE)) 
-
-png(here::here("figures","compare","expanded",paste0("reconstr_geog_lag_",lag,"_",suffix,".png")), height = 1000, width = 1500, res = 150)
-print(
-  scaled_quants_geog %>%
-    ggplot(aes(week)) + 
-    geom_ribbon(aes(ymin = low, ymax = high), alpha = 0.2, fill = "steelblue") +
-    geom_line(aes(y = med), col = "steelblue") +
-    scale_x_date(limits = range(data$week)) +
-    geom_point(aes(y = obs)) +
-    facet_wrap(~geography, scales = "free_y") +
-    labs(x = "",y = "Confirmed case count", title = "Reconstruction of confirmed cases from COVID-19-related deaths",
-         subtitle = "by geography type",
-         caption = paste0("Median and ",(plot_quants[2]-plot_quants[1])*100,
-                           "% quantile interval over ", nsims, " posterior simulations, scaled by ",
-                          # samples_cfr, 
-                          # "samples from",
-                          min(scale_quants)*100,"% to ", max(scale_quants)*100, "% quantiles of",
-                          " the observed CFR distribution post-P2 expansion.")) +
-    theme_minimal()
-)
-dev.off()
-
-return(scaled_sims)
-
-}
-
-scale_quants <- seq(0.1,0.9,0.1)
-plot_quants <- c(0.05,0.95)
-
-scaled_sims0 <- reconstruct(sims = dat_sims, data = dat, lag = 0, scale_quants = scale_quants, plot_quants = plot_quants, suffix = "avgcov")
-scaled_sims7 <- reconstruct(sims = dat_sims, data = dat, lag = 7, scale_quants = scale_quants, plot_quants = plot_quants, suffix = "avgcov")
-scaled_sims14 <- reconstruct(sims = dat_sims, data = dat, lag = 14, scale_quants = scale_quants, plot_quants = plot_quants, suffix = "avgcov")
-scaled_sims21 <- reconstruct(sims = dat_sims, data = dat, lag = 21, scale_quants = scale_quants, plot_quants = plot_quants, suffix = "avgcov")
-
-lagcomp <- bind_rows(scaled_sims0, scaled_sims7, scaled_sims14)
-
-png(here::here("figures","compare","expanded","reconstr_totals.png"), height = 1200, width = 2800, res = 250)
-lagcomp %>%
-  group_by(lag, week, sim) %>%
-  summarise(pred_n_scale = sum(pred_n_scale, na.rm = TRUE),
-            cases = sum(n, na.rm = TRUE)) %>%
-  group_by(lag,week) %>%
-  summarise(low = quantile(pred_n_scale, plot_quants[1], na.rm = TRUE),
-            med = quantile(pred_n_scale, 0.5, na.rm = TRUE),
-            high = quantile(pred_n_scale, plot_quants[2], na.rm = TRUE),
-            cases = unique(cases, na.rm = TRUE)) %>%
-  ggplot(aes(week)) + 
-  geom_ribbon(aes(ymin = low, ymax = high), alpha = 0.2, fill = "steelblue") +
-  geom_line(aes(y = med), col = "steelblue") +
-  scale_x_date() +
-  geom_point(aes(y = cases)) +
-  facet_wrap(~lag) +
-  labs(x = "",y = "", title = "Reconstruction of confirmed cases from COVID-19-related deaths across England",
-       subtitle = "Comparison of assumed lags between case confirmation and death",
-       caption = paste0("Median and ",(plot_quants[2]-plot_quants[1])*100,
-                        "% quantile interval over 1000 posterior simulations, scaled by ",
-                        # samples_cfr, 
-                        # "samples",
-                        min(scale_quants)*100,"% to ", max(scale_quants)*100, "% quantiles",
-                        " from the observed CFR distribution post-P2 expansion.")) +
-  theme_minimal() 
-dev.off()
-
-## Total cases overall
-scaled_sims7 %>%
-  group_by(sim) %>%
-  summarise(pred_n_scale = sum(pred_n_scale, na.rm = TRUE),
-            cases = sum(n, na.rm = TRUE)) %>%
-  summarise(low = quantile(pred_n_scale, plot_quants[1], na.rm = TRUE),
-            med = quantile(pred_n_scale, 0.5, na.rm = TRUE),
-            high = quantile(pred_n_scale, plot_quants[2], na.rm = TRUE),
-            observed = unique(cases, na.rm = TRUE)) -> totals
-totals
-#     low     med    high observed
-# 107783. 334155. 884277.   229758
-
-dplyr::select(totals, -observed) - totals$observed
-#       low      med     high
-# -121974.7 104396.6 654519.5
-
-totals %>%
-  mutate(across(-observed, function(x) (x - totals$observed)*100/totals$observed)) %>%
-  as.data.frame()
-
-## By geography
-scaled_sims7 %>%
-  group_by(geography, sim) %>%
-  summarise(pred_n_scale = sum(pred_n_scale, na.rm = TRUE),
-            cases = sum(n, na.rm = TRUE)) %>%
-  group_by(geography) %>%
-  summarise(low = quantile(pred_n_scale, plot_quants[1], na.rm = TRUE),
-            med = quantile(pred_n_scale, 0.5, na.rm = TRUE),
-            high = quantile(pred_n_scale, plot_quants[2], na.rm = TRUE),
-            observed = unique(cases, na.rm = TRUE)) %>%
-  ungroup() -> geog_totals
-geog_totals
-
-geog_totals %>%
-  mutate(across(c(-geography,-observed), function(x) (x - geog_totals$observed)*100/geog_totals$observed)) %>%
-  as.data.frame()
-
-# ---------------------------------------------------------------------------- #
-
-# Map out the median differences
-scaled_sims7 %>%
-  group_by(lad19cd, sim) %>%
-  summarise(pred_n_scale = sum(pred_n_scale, na.rm = TRUE),
-            cases = sum(n, na.rm = TRUE)) %>%
-  group_by(lad19cd) %>%
-  summarise(med = quantile(pred_n_scale, 0.5, na.rm = TRUE),
-            cases = unique(cases, na.rm = TRUE)) %>%
-  ungroup() %>% 
-  mutate(ratio = (med/cases)) -> scale_by_la
-
-summary(scale_by_la$ratio)
-
-scale_by_la %>%
-  summarise(low = quantile(ratio, plot_quants[1], na.rm = TRUE),
-            med = quantile(ratio, 0.5, na.rm = TRUE),
-            high = quantile(ratio, plot_quants[2], na.rm = TRUE)) %>%
-  as.data.frame()
-  
-png(here::here("figures","compare","expanded","underascertainment_lag_7.png"), height = 1500, width = 2000, res = 250)
-regions %>%
-  full_join(scale_by_la) %>%
-  basic_map(fill = "ratio", plot.border = T) + 
-  scale_fill_gradient2(midpoint = 0, trans = "log2") + 
-  labs(fill = "Ratio", title = "Relative difference between median inferred total cases\nand observed test positives",
-       subtitle = paste0("Predicted deaths back-dated by one week"))
-dev.off()
-
-###############################################################################
-###############################################################################

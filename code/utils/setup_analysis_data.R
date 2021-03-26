@@ -80,7 +80,7 @@ dat <- d_agg_wk %>%
          pop_dens = la_pop/area_km2,
          IMD_quint = cut(IMD, 5)) %>% 
   dplyr::select(n, E, E_wk, E_wk_unstrat, w, week, lad19cd, lad19nm, la_pop, geog, geography, area_km2, pop_dens,
-                first, wk_since_first, first_overall, wk_first_la_overall, IMD, IMD_quint, prop_minority, prop_kw) %>%
+                first, wk_since_first, first_overall, wk_first_la_overall, med_age, IMD, IMD_quint, prop_minority, prop_kw) %>%
   mutate(w2 = w, w3 = w, SIR = n/E) 
 
 # add numeric indices for each LTLA
