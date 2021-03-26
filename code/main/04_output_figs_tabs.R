@@ -44,10 +44,10 @@ weekrange <- seq(min(dat$w), max(dat$w))
 weekseq <- seq(min(dat$week), max(dat$week), by = "week")
 
 # Fitted models and posterior samples
-fits <- readRDS(file = here::here("output/expanded_data",
+fits <- readRDS(file = here::here("output",
                                   sprintf("fits_%s_%s.rds",measure, wave)))
 fit_final <- fits[[6]]
-samples <- readRDS(file = here::here("output/expanded_data",
+samples <- readRDS(file = here::here("output",
                                      sprintf("samples_%s_%s.rds",measure, wave)))
 samples_final <- samples[[6]]
 
@@ -67,7 +67,13 @@ dev.off()
 table <- model_comp(fits)
 table
 
-saveRDS(table, here::here("output/expanded_data",paste0("model_comp_",measure,".rds")))
+write.csv(table, here::here("output/expanded_data",paste0("model_comp_",measure,".csv")), row.names = F)
+
+# ---------------------------------------------------------------------------- #
+# Covariates
+
+coeffs <- lapply(fits, get_coeffs)
+coeffs
 
 # ---------------------------------------------------------------------------- #
 # MAP MODEL MSE
@@ -278,17 +284,17 @@ print(
 dev.off()
 
 # LTLAs with low and high average relative risks
-dat_tot %>% 
+dat_tot %>%
   mutate(crude_RR = n/E) %>%
   right_join(filter(quants_by_la, q50 > 2)) -> high_RR
 
-dat_tot %>% 
+dat_tot %>%
   mutate(crude_RR = n/E) %>%
   right_join(filter(quants_by_la, q50 < 0.25)) -> low_RR
 
 pdf(here::here("figures",measure,"expanded_data","high_low_RR.pdf"), width = 8, height = 6)
-plot_la_samp(dat_pred, high_RR$la, pred = "pred_n", obs = "n") 
-plot_la_samp(dat_pred, low_RR$la, pred = "pred_n", obs = "n") 
+plot_la_samp(dat_pred, high_RR$la, pred = "pred_n", obs = "n")
+plot_la_samp(dat_pred, low_RR$la, pred = "pred_n", obs = "n")
 dev.off()
 
 la_samp_list <- list(random = sample(dat_tot$la,9),
@@ -303,10 +309,10 @@ la_samp_list <- list(random = sample(dat_tot$la,9),
   
   
   pdf(here::here("figures",measure,"parms_fixed.pdf"))
-  lapply(names(fit_final_d$marginals.fixed), plot_parm, opt = 1)
+  lapply(names(fit_final$marginals.fixed), plot_parm, opt = 1)
   dev.off()
   pdf(here::here("figures",measure,"parms_hyper.pdf"))
-  lapply(names(fit_final_c$marginals.hyperpar), plot_parm, opt = 2)
+  lapply(names(fit_final$marginals.hyperpar), plot_parm, opt = 2)
   dev.off()
   
 
@@ -340,7 +346,7 @@ la_samp_list <- list(random = sample(dat_tot$la,9),
   dat_pred %>%
     group_by(week, name) %>%
     summarise(pred = sum(pred_n),
-              n = sum(n),
+              n = sum(n, na.rm = T),
               pop = sum(la_pop)) %>%
     ggplot() + 
     geom_line(aes(week, pred*1e5/pop, group = name), alpha = 0.1, col = "grey") +
@@ -350,13 +356,13 @@ la_samp_list <- list(random = sample(dat_tot$la,9),
   dat_pred %>%
     group_by(week, name, geography) %>%
     summarise(pred = sum(pred_n),
-              n = sum(n),
+              n = sum(n, na.rm = T),
               pop = sum(la_pop)) %>%
     mutate(group = paste0(name, geography)) -> by_samp_geog
   by_samp_geog %>%
     group_by(week, geography) %>%
     summarise(pred = mean(pred),
-              n = mean(n),
+              n = mean(n, na.rm = T),
               pop = mean(pop)) -> by_geog
   
 
@@ -560,11 +566,11 @@ print(
 )
 
 
-# la_samp <- sample(dat$la,9)
+la_samp <- sample(unique(dat$la),9)
 # la_list <- c("Liverpool", "Bromley","Bedford", "Allerdale","Wigan","Epping Forest")
-london <- unique(dat$lad19nm[dat$geography == "London Borough"])
+# london <- unique(dat$lad19nm[dat$geography == "London Borough"])
 la_list <- c("Leeds", "Bradford",sample(london,2))
-la_samp <- unique(dat$la[dat$lad19nm %in% la_list])
+# la_samp <- unique(dat$la[dat$lad19nm %in% la_list])
 print(
   dat_pred %>%
     filter(la %in% la_samp) %>%
@@ -587,6 +593,8 @@ lapply(post_fixed, inla.zmarginal)
 # Prop minority (rescale to %)
 inla.zmarginal(inla.tmarginal(function(x) exp(x/100), fit_final$marginals.fixed[[6]]))
 
+get_coeffs(fit_final)
+
 png(here::here("figures",measure,"expanded_data","covariates_final.png"), height = 800, width = 1000, res = 150)
 # tiff(filename = "./figures/final_altdata/map_resids.tif", height = 600, width = 1000)
 
@@ -598,7 +606,4 @@ fit_final$summary.fixed[-1,] %>% #rep_BYM
   labs(y = "Estimate") 
 dev.off()
 
-
-# ---------------------------------------------------------------------------- #
-# Map fitted values over time
 

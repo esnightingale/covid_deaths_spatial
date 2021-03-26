@@ -16,7 +16,7 @@ library(tidyverse)
 measure <- "deaths"
 expected <- "E"
 wave <- 1
-nsims <- 100000
+nsims <- 1000
 
 list.files(here::here("code","utils"), full.names = TRUE) %>% walk(source)
 
@@ -36,7 +36,7 @@ dat_all <- readRDS(here::here("data",paste0(measure,".rds")))
 dat <- dat_all[[wave]]
 period <- dat_all$breaks[[wave]]
 
-# dat$n[dat$n == 0] <- NA
+dat$n[dat$wk_since_first < 0] <- NA
 
 ################################################################################
 # PRIOR SPECIFICATION
@@ -178,7 +178,7 @@ f_bym_geog <- n ~
 formulae <- list(base = f_base, base_geog = f_base_geog, iid = f_iid, iid_geog = f_iid_geog, BYM = f_bym, BYM_geog = f_bym_geog) #, BYM_geog_nocovs = f_bym_geog_nocovs
 fits <- lapply(formulae, fit_mod, dat, expected = expected)
 
-saveRDS(fits, file = here::here("output/expanded_data",sprintf("fits_%s_%s.rds",measure, wave)))
+saveRDS(fits, file = here::here("output",sprintf("fits_%s_%s.rds",measure, wave)))
 
 # Just final model
 # fit <- fit_mod(f_bym_geog, dat, expected = expected)
@@ -187,7 +187,7 @@ saveRDS(fits, file = here::here("output/expanded_data",sprintf("fits_%s_%s.rds",
 
 # ## Draw posterior samples ##
 samples <- lapply(fits, inla.posterior.sample,n = nsims)
-saveRDS(samples, file =  here::here("output/expanded_data",sprintf("samples_%s_%s.rds",measure, wave)))
+saveRDS(samples, file =  here::here("output",sprintf("samples_%s_%s.rds",measure, wave)))
 
 # Just final model
 # samples <- inla.posterior.sample(fit, n = 1000)
