@@ -15,7 +15,8 @@ map_theme <- function () {
           axis.title=element_blank(),
           axis.text=element_blank(),
           axis.ticks=element_blank(),
-          legend.position = c(0.1,0.5)) 
+          legend.position = c(0.1,0.5),
+          plot.margin = margin(0, 0, 0, 0, "cm"))
 }
 
 basic_map <- function(sf, fill, rate1e5 = F, plot.border = F, scale = T){
@@ -55,7 +56,6 @@ fit_mod <- function(f, dat, expected = "E", family = "nbinomial"){
               family,
               data = dat,
               E = E_wk,
-              # offset = log(la_age_pop),
               control.compute=list(dic=TRUE, 
                                    waic=TRUE, 
                                    cpo = TRUE,
@@ -67,7 +67,6 @@ fit_mod <- function(f, dat, expected = "E", family = "nbinomial"){
     fit <- inla(f,
                 family,
                 data = dat,
-                # E = E_wk,
                 offset = log(la_pop),
                 control.compute=list(dic=TRUE, 
                                      waic=TRUE, 
@@ -146,6 +145,7 @@ get_preds <- function(sample,dat){
 #   }
 #   return(sims_scale[-1,])
 # }
+
 lag_rescale <- function(scale, lag, sims){
   
   # setDT(sims)

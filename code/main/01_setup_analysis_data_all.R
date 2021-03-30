@@ -18,7 +18,7 @@ covs <- readRDS(paste0(datadir,"covs.rds"))
 ## Shapefiles
 regions <- readRDS(paste0(datadir,"maps/LA_shp_wpops.rds")) %>%
   dplyr::filter(grepl("E", lad19cd))
-regions.df <- st_drop_geometry(regions)
+regions.df <- sf::st_drop_geometry(regions)
 
 list.files(here::here("code","utils"), full.names = TRUE) %>% purrr::walk(source)
 

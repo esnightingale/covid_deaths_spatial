@@ -1,4 +1,4 @@
-plot_reconst <- function(agg_sims, lag, sample = NA, suffix = "", h = 50, w = 50, order = T, format = "pdf"){
+plot_reconst <- function(agg_sims, lag, sample = NA, save = T, suffix = "", h = 50, w = 50, order = T, format = "pdf"){
   
   plot.data <- agg_sims$preds
   
@@ -6,11 +6,11 @@ plot_reconst <- function(agg_sims, lag, sample = NA, suffix = "", h = 50, w = 50
     suffix <- paste0(suffix, "_la")
     plot.data$facet <- plot.data$lad19nm
     if (!is.na(sample)){
-      plot.data <- filter(plot.data, lad19nm %in% sample) 
+      plot.data <- dplyr::filter(plot.data, lad19nm %in% sample) 
       suffix <- paste0(suffix, "samp")
       if(order == F){
         plot.data <- plot.data %>%
-        mutate(facet = factor(facet, levels = sample))
+          dplyr::mutate(facet = factor(facet, levels = sample))
       }
     }
   }
@@ -48,14 +48,17 @@ plot_reconst <- function(agg_sims, lag, sample = NA, suffix = "", h = 50, w = 50
       facet_wrap(~facet, scales = "free") 
   }
 
-
-  if (format == "pdf"){  
-    pdf(here::here("figures","compare","expanded",paste0("reconstr_lag",lag,suffix,".pdf")), height = h, width = w)
-    print(p)
-    dev.off()
-  } else if(format == "png") {
-    png(here::here("figures","compare","expanded",paste0("reconstr_lag",lag,suffix,".png")), height = h, width = w, res = 200)
-    print(p)
-    dev.off()
+  if (save == T){
+    if (format == "pdf"){  
+      pdf(here::here("figures","compare","expanded",paste0("reconstr_lag",lag,suffix,".pdf")), height = h, width = w)
+      print(p)
+      dev.off()
+    } else if(format == "png") {
+      png(here::here("figures","compare","expanded",paste0("reconstr_lag",lag,suffix,".png")), height = h, width = w, res = 200)
+      print(p)
+      dev.off()
+    }
+  } else {
+    return(p)
   }
 }

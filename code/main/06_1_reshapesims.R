@@ -27,21 +27,21 @@ setDF(dat) %>%
          n = NA)  -> dat_avgcov
 
 # Make pred data with average covariate values
-dat_pred <- bind_rows(dat, dat_avgcov) %>%
-  mutate(IMD_quint = factor(IMD_quint, levels = levels(dat$IMD_quint)))
+dat_pred <- dplyr::bind_rows(dat, dat_avgcov) %>%
+  dplyr::mutate(IMD_quint = factor(IMD_quint, levels = levels(dat$IMD_quint)))
 
 pred_avgcov <- readRDS(here::here("output","fit_samples_expanded_avgcov.rds"))
 fit_pred <- pred_avgcov$fit
 samples_pred <- pred_avgcov$samples
 
-sims <- as.data.table(bind_cols(lapply(samples_pred, get_preds, dat_pred)))
+sims <- as.data.table(dplyr::bind_cols(lapply(samples_pred, get_preds, dat_pred)))
 saveRDS(sims, file = here::here("output","sims_expanded_avgcov.rds"))
 
 sims <- readRDS(file = here::here("output","sims_expanded_avgcov.rds"))
 data.table::setDT(sims)
 
 cases <- readRDS(here::here("data","cases.rds"))[[1]] %>%
-  rename(cases = n) %>%
+  dplyr::rename(cases = n) %>%
   dplyr::select(week, lad19nm, cases)
 
 # ---------------------------------------------------------------------------- #
@@ -71,7 +71,10 @@ agg_sims <- sims_long[,.(q05 = quantile(pred_n, 0.05),
 
 write.csv(agg_sims, file = here::here("output","pred_quants_avgcov.csv"), row.names = F)
 
-# ---------------------------------------------------------------------------- #
+
+################################################################################
+################################################################################
+
 ## Check fit by geography and for a samples of LTLAs
 
 plot_geog <- sims_long[,.(pred_n = sum(pred_n)), by = .(week, variable, geography)] 

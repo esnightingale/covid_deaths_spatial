@@ -17,9 +17,9 @@ join_city <- function(d){
   d$Code[d$Name == "Westminster"] <- "E09000033"
   
   d <- d %>%
-    group_by(Code, Name, Geography1) %>%
-    summarise_all(sum) %>%
-    ungroup()
+    dplyr::group_by(Code, Name, Geography1) %>%
+    dplyr::summarise_all(sum) %>%
+    dplyr::ungroup()
   
   d$gt65 <- rowSums(dplyr::select(d,`65`:`90`))
   
@@ -57,35 +57,33 @@ pops$mean_age <- rowSums(pops[,agevars]*as.integer(names(pops)[agevars]))/pops$`
 pops$Name[pops$Name == "City of London"] <- "Westminster"
 pops$Code[pops$Name == "Westminster"] <- "E09000033"
 
-pops.long <- 
-  pops %>%
-  rename(geography = Geography1,
+pops.long <- pops %>%
+  dplyr::rename(geography = Geography1,
          lad19cd = Code,
          lad19nm = Name,
          la_pop = `All ages`) %>%
   dplyr::select(lad19cd:la_pop, mean_age, everything()) %>%
-  pivot_longer(cols = -lad19cd:-mean_age, names_to = "age", values_to = "pop") %>% # View()
-  mutate(age = as.integer(age)) %>%
-  group_by(lad19cd,lad19nm,geography, age) %>%
-  summarise(la_pop = sum(unique(la_pop)),
+  dplyr::pivot_longer(cols = -lad19cd:-mean_age, names_to = "age", values_to = "pop") %>% # View()
+  dplyr::mutate(age = as.integer(age)) %>%
+  dplyr::group_by(lad19cd,lad19nm,geography, age) %>%
+  dplyr::summarise(la_pop = sum(unique(la_pop)),
             pop = sum(pop),
             mean_age = mean(mean_age)) %>%
-  group_by(lad19cd,lad19nm,la_pop, mean_age) %>% 
-  mutate(age_group = cut(age, breaks = c(seq(0,90,5),110), right = F, include.lowest = TRUE, ordered_result = TRUE),
-         age_group10 = cut(age, breaks = c(seq(0,90,10),110), right = F, include.lowest = TRUE, ordered_result = TRUE),
-         # age_quintile = cut(age, breaks = 5, right = F, include.lowest = TRUE, ordered_result = TRUE),
-         cum.prop = cumsum(pop)/la_pop,
-         cum.prop = case_when(cum.prop <= 0.5 ~ cum.prop,
-                              cum.prop > 0.5 ~ 0),
-         q50 = which.max(cum.prop),
-         med_age = age[q50],
-         med_agegrp = age_group[q50]) %>% 
-  group_by(lad19cd,lad19nm, geography, la_pop, age_group, age_group10) %>%
-  summarise(la_age_pop = sum(pop),
-            mean_age = unique(mean_age),
-            med_age = unique(med_age)) %>%
-  ungroup() %>%
-  mutate_at(vars("age_group","age_group10"),as.character) 
+  dplyr::group_by(lad19cd,lad19nm,la_pop, mean_age) %>% 
+  dplyr::mutate(age_group = cut(age, breaks = c(seq(0,90,5),110), right = F, include.lowest = TRUE, ordered_result = TRUE),
+                age_group10 = cut(age, breaks = c(seq(0,90,10),110), right = F, include.lowest = TRUE, ordered_result = TRUE),
+                cum.prop = cumsum(pop)/la_pop,
+                cum.prop = case_when(cum.prop <= 0.5 ~ cum.prop,
+                                     cum.prop > 0.5 ~ 0),
+                q50 = which.max(cum.prop),
+                med_age = age[q50],
+                med_agegrp = age_group[q50]) %>% 
+  dplyr::group_by(lad19cd,lad19nm, geography, la_pop, age_group, age_group10) %>%
+  dplyr::summarise(la_age_pop = sum(pop),
+                   mean_age = unique(mean_age),
+                   med_age = unique(med_age)) %>%
+  dplyr::ungroup() %>%
+  dplyr::mutate_at(vars("age_group","age_group10"),as.character) 
 
 
 pops.long$age_group[pops.long$age_group == "[90,110]"] <- "[90,NA)"
@@ -97,15 +95,15 @@ pops.long <-
 
 pops.wide <- pops.long %>%
   dplyr::select(-age_group10) %>% #-age_quintile
-  pivot_wider(id_cols = c(-age_group,-la_age_pop), names_from = age_group, values_from = la_age_pop)
+  dplyr::pivot_wider(id_cols = c(-age_group,-la_age_pop), names_from = age_group, values_from = la_age_pop)
 
 ################################################################################
 # Add populations to shapefile
 
 regions <- st_as_sf(regions_raw) %>%
-  rename_all(tolower) %>%
-  filter(!grepl("N",lad19cd) & !grepl("S",lad19cd)) %>%  # remove NI and Scotland
-  mutate_if(is.factor, as.character) # make factors into character to edit levels for aggregation
+  dplyr::rename_all(tolower) %>%
+  dplyr::filter(!grepl("N",lad19cd) & !grepl("S",lad19cd)) %>%  # remove NI and Scotland
+  dplyr::mutate_if(is.factor, as.character) # make factors into character to edit levels for aggregation
 
 # Aggregate Aylsbury Vale, Chiltern, South Bucks and Wycombe into Buckinghamshire unitary authority (created April 2020)
 regions$lad19nm[regions$lad19nm %in% c("Aylesbury Vale","Chiltern", "South Bucks", "Wycombe")] <- "Buckinghamshire"
@@ -120,20 +118,20 @@ regions$lad19nm[regions$lad19nm == "Isles of Scilly"] <- "Cornwall"
 regions$lad19cd[regions$lad19nm == "Cornwall"] <- "E06000052"
 
 regions <- regions %>%
-  group_by(lad19cd, lad19nm) %>%
-  summarise() %>%
-  ungroup()
+  dplyr::group_by(lad19cd, lad19nm) %>%
+  dplyr::summarise() %>%
+  dplyr::ungroup()
 
 # Merge population data with shapefile and add projection
-regions <- left_join(regions, pops.wide) %>%
-  st_transform("+init=epsg:27700 +units=km +no_defs")
+regions <- dplyr::left_join(regions, pops.wide) %>%
+  sf::st_transform("+init=epsg:27700 +units=km +no_defs")
 
 
 ################################################################################
 # Sex ratio - population gt 65 
 
 prop_male <- male %>%
-  rename(lad19cd = Code,
+  dplyr::rename(lad19cd = Code,
          lad19nm = Name,
          prop_male_all = `All ages`,
          prop_male_gt65 = gt65)
@@ -142,8 +140,8 @@ prop_male[,-1:-3] <- prop_male[,-1:-3]/(prop_male[,-1:-3]+female[,-1:-3])
 ## Add to regions df:
 regions <- 
   regions %>%
-  left_join(dplyr::select(prop_male, lad19cd, lad19nm, prop_male_all, prop_male_gt65))
-regions$area_km2 <- st_area(regions)
+  dplyr::left_join(dplyr::select(prop_male, lad19cd, lad19nm, prop_male_all, prop_male_gt65))
+regions$area_km2 <- sf::st_area(regions)
 
 
 ################################

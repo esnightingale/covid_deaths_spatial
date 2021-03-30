@@ -260,21 +260,20 @@ cases[[1]] %>%
   group_by(lad19cd) %>%
   summarise(n = sum(n, na.rm = TRUE)) %>% 
   full_join(regions) %>%
-  basic_map(fill = "n", rate1e5 = TRUE, scale = F) +
-  labs(title = "Confirmed cases per 100,000",
-       subtitle = paste(period[1],"-",period[2])) + 
-  map_theme() -> case_map
+  basic_map(fill = "n", rate1e5 = TRUE, scale = F) -> case_map
+  # labs(title = "Confirmed cases per 100,000",
+  #      subtitle = paste(period[1],"-",period[2])) + 
+
 deaths[[1]] %>%
   group_by(lad19cd) %>%
   summarise(n = sum(n, na.rm = TRUE)) %>% 
   full_join(regions) %>%
-  basic_map(fill = "n", rate1e5 = TRUE, scale = T) +
-  labs(title = "Deaths per 100,000") + 
-  map_theme() -> death_map
+  basic_map(fill = "n", rate1e5 = TRUE, scale = F) -> death_map
+  # labs(title = "Deaths per 100,000") + 
 
 
 png(here::here(figdir,"map_totals.png"), height = 1000, width = 1500, res = 150)
-  case_map + death_map
+case_map + death_map
 dev.off()
 
 deaths[[1]] %>% 
@@ -311,7 +310,7 @@ deaths[[1]] %>%
             geog_pop = sum(la_pop)) %>%
   ggplot(aes(week, n*1e5/geog_pop, group = geography, col = geography)) +
   geom_line() +
-  labs(title = "COVID19-related deaths in England, by geography and week of death",
+  labs(subtitle = "COVID19-related deaths in England, by geography and week of death",
        # subtitle = paste(period[1],"-",period[2]),
        x = "",
        y = "Rate per 100,000", 
@@ -339,7 +338,7 @@ cases[[1]] %>%
   annotate("text", x = ymd("2020-04-16"), y = 55, label = "P2 available to care home residents and staff", cex = 2, hjust = "left") +
   geom_vline(xintercept = ymd("2020-05-18"), lty = "dashed", lwd = 0.2) +
   annotate("text", x = ymd("2020-05-19"), y = 60, label = "P2 available to all symptomatic cases", cex = 2, hjust = "left") +
-  labs(title = "Confirmed COVID-19 cases in England, by geography and week of specimen",
+  labs(subtitle = "Confirmed COVID-19 cases in England, by geography and week of specimen",
        x = "Calendar week",
        y = "Rate per 100,000") +
   guides(col = FALSE) +
@@ -348,6 +347,12 @@ cases[[1]] %>%
 png(here::here(figdir,"ts_geog.png"), height = 1000, width = 1500, res = 150)
 ts_geog_deaths / ts_geog_cases
 dev.off()
+
+
+png(here::here(figdir,"fig1.png"), height = 1200, width = 2000, res = 150)
+(ts_geog_deaths | death_map) / (ts_geog_cases | case_map ) + plot_layout(widths = c(2,1))
+dev.off()
+
 
 # ---------------------------------------------------------------------------- #
 ## TIME SERIES - BY LTLA ##
@@ -428,7 +433,7 @@ print(summary(ratio_la$CFR[ratio_la$period == 2]))
 regions %>%
   full_join(ratio_la) %>%
   mutate(period = factor(period,labels = c("2020-01-04 - 2020-05-17","2020-05-18 - 2020-06-28"))) %>%
-  basic_map(fill = "CFR") +
+  basic_map(fill = "CFR", scale = F) +
   scale_fill_viridis_c(trans = "log2") +
   facet_wrap(~period, ncol = 2) +
   labs(title = "",
@@ -446,7 +451,7 @@ ggplot(ratio, aes(week, CFR)) +
   annotate("text", x = ymd("2020-04-16"), y = 0.15, label = "P2 available to care home residents and staff", cex = 2, hjust = "left") +
   labs(x = "", y = "Observed CFR") -> time
 
-png(here::here("figures","compare",paste0("map_obs_cfr_",lag,".png")), height = 1000, width = 1500, res = 150)
+png(here::here("figures","compare",paste0("map_obs_cfr_",lag,".png")), height = 1000, width = 1500, res = 200)
 print(
 maps #+ plot_annotation(title = 'Observed ratio of cases to deaths before and after expansion of Pillar 2 testing')
 )
@@ -460,8 +465,8 @@ return(ratio)
 
 }
 
-ratio_7 <- calc_ratio(deaths, cases, 7, 1)
-ratio_14 <- calc_ratio(deaths, cases, 14, 1)
+ratio_7 <- calc_ratio(deaths[[1]], cases[[1]], 7, 1)
+ratio_14 <- calc_ratio(deaths[[1]], cases[[1]], 14, 1)
 
 ratio_7 %>%
   group_by(geography, period) %>%
