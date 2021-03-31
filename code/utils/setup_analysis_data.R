@@ -29,20 +29,20 @@ la_pops <- calc_E(alldata_sub)
 ltla_first <- alldata_sub %>%
   dplyr::select(lad19cd, ltla_first) %>%
   unique()
-#   
-# week_seq <- ymd(seq(min(alldata_sub$week), max(alldata_sub$week), by = "week"))
-# expand <- data.frame(week = rep(week_seq, n_distinct(alldata_sub$lad19cd)),
-#                       lad19cd = rep(unique(alldata_sub$lad19cd), each = length(week_seq))) %>%
-#   full_join(ltla_first) %>%
-#   mutate(w = as.integer(lubridate::week(week))) %>%
-#   left_join(la_pops)
+
+week_seq <- ymd(seq(min(alldata_sub$week), max(alldata_sub$week), by = "week"))
+expand <- data.frame(week = rep(week_seq, n_distinct(alldata_sub$lad19cd)),
+                      lad19cd = rep(unique(alldata_sub$lad19cd), each = length(week_seq))) %>%
+  full_join(ltla_first) %>%
+  mutate(w = as.integer(lubridate::week(week))) %>%
+  left_join(la_pops)
 
 ## Aggregate linelist by week and LA
 alldata_sub %>%
   group_by(lad19cd, week) %>%
   count() %>%
   ungroup() %>%
-  # full_join(expand) %>% 
+  full_join(expand) %>%
   full_join(ltla_first) %>%
   left_join(la_pops) %>%
   mutate(n = replace_na(n, 0),

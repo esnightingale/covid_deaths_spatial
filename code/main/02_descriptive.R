@@ -53,18 +53,7 @@ dev.off()
 
 ## COVARIATES ##
 
-# Median age
-
-png(here::here("figures","descriptive","map_age.png"), height = 800, width = 900, res = 150)
-print(
-regions %>%
-  basic_map(fill = "med_age") +
-  scale_fill_viridis_c() +
-  labs(fill = "", title = "Median age")
-)
-dev.off()
-
-cov_names <- c("pop_dens", "IMD", "prop_minority","prop_kw")
+cov_names <- c("med_age","pop_dens", "IMD", "prop_minority", "prop_kw")
 deaths[[1]] %>%
   group_by(geography, lad19cd) %>%
   summarise_at(all_of(cov_names), .funs = base::mean) %>%
@@ -73,6 +62,7 @@ deaths[[1]] %>%
 
 # Summarise covariates
 get_quants <- function(var){ paste(round(quantile(var, p = c(0.25,0.5,0.75)),2), collapse = ", ")}
+
 # By geography
 covs %>% 
   group_by(geography) %>%
@@ -103,14 +93,14 @@ map_mino <-
   scale_fill_viridis_c(trans = "log10") +
   theme(plot.title = element_text(size=10))
 
-map_kw <-
-  basic_map(regions_wcovs, fill = "prop_kw") +
-  labs(fill = "", title = "Proportion of population\n classified as key workers") +
+map_age <-
+  basic_map(regions_wcovs, fill = "med_age") +
+  labs(fill = "", title = "Median age") +
   theme(plot.title = element_text(size=10))
 
 png(here::here("figures","descriptive","map_covariates.png"), height = 1200, width = 1200, res = 150)
-(map_dens + map_imd) /
-  (map_mino + map_kw)
+(map_age + map_dens) /
+  (map_mino + map_imd)
 dev.off()
 
 
