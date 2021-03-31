@@ -148,24 +148,14 @@ lagcomp %>%
   theme_minimal() 
 dev.off()
 
-
-if (type == "total") {
-  scaled_sims <- group_by(scaled_sims, week, sim, scale_quant) %>%
-    dplyr::summarise(pred_n_scale = sum(pred_n_scale),
-                     obs = sum(n, na.rm = T),
-                     lag = unique(lag)) %>%
-    group_by(week)
-}
-
-reconstruct7$sims %>% 
-  dplyr::group_by(week) %>%
-  dplyr::slice_sample(100) %>%
-  dplyr::group_by(week, sim, scale_quant) %>%
-  dplyr::summarise(pred_n_scale = sum(pred_n_scale),
-                   obs = sum(n, na.rm = T)) %>%
-  ggplot(aes(week, pred_n_scale, group = sim)) +
-  geom_line(alpha = 0.5, col = "grey") +
-  geom_point(aes(y = obs)) 
+# reconstruct7$sims %>% 
+#   dplyr::filter(sim %in% 1:100) %>%
+#   dplyr::group_by(week, sim, scale_quant) %>%
+#   dplyr::summarise(pred_n_scale = sum(pred_n_scale),
+#                    obs = sum(n, na.rm = T)) %>%
+#   ggplot(aes(week, pred_n_scale, group = sim)) +
+#   geom_line(alpha = 0.5, col = "grey") +
+#   geom_point(aes(y = obs)) 
 
 
 # ---------------------------------------------------------------------------- #

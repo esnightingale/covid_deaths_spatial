@@ -77,30 +77,40 @@ regions %>%
   mutate(pop_dens = as.numeric(pop_dens)) -> regions_wcovs
 
 map_dens <-
-  basic_map(regions_wcovs, fill = "pop_dens") +
+  basic_map(regions_wcovs, fill = "pop_dens", scale = F) +
   scale_fill_viridis_c(trans = "log10") +
-  labs(fill = "", title = "Population per KM^2") +
+  labs(fill = "", title = "Population density \n(per KM-squared)") +
+  theme(plot.title = element_text(size=10))
+
+map_pop <-
+  basic_map(regions_wcovs, fill = "la_pop", scale = F) +
+  scale_fill_viridis_c(trans = "log10") +
+  labs(fill = "", title = "Population size") +
   theme(plot.title = element_text(size=10))
 
 map_imd <-
-  basic_map(regions_wcovs, fill = "IMD") +
-  labs(fill = "", title = "Index of Multiple Deprivation") +
+  basic_map(regions_wcovs, fill = "IMD", scale = F) +
+  labs(fill = "", title = "Index of Multiple Deprivation \n(median score)") +
   theme(plot.title = element_text(size=10))
 
 map_mino <-
-  basic_map(regions_wcovs, fill = "prop_minority") +
+  basic_map(regions_wcovs, fill = "prop_minority", scale = F) +
   labs(fill = "", title = "Proportion of black and \nminority ethnic population") +
   scale_fill_viridis_c(trans = "log10") +
   theme(plot.title = element_text(size=10))
 
 map_age <-
-  basic_map(regions_wcovs, fill = "med_age") +
+  basic_map(regions_wcovs, fill = "med_age", scale = F) +
   labs(fill = "", title = "Median age") +
   theme(plot.title = element_text(size=10))
 
 png(here::here("figures","descriptive","map_covariates.png"), height = 1200, width = 1200, res = 150)
-(map_age + map_dens) /
+(map_age + map_pop) /
   (map_mino + map_imd)
+dev.off()
+
+png(here::here("figures","descriptive","map_covariates3.png"), height = 600, width = 1800, res = 150)
+(map_age + map_mino + map_imd)
 dev.off()
 
 
