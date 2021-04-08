@@ -118,7 +118,7 @@ ggplot(setDT(dat_plot_geog)) +
   labs(x = "Calendar week", y = "Rate per 100,000", title = "Total fit over time, by calendar week and geography", subtitle = paste0("Observed rates shown in white, with ", nsims, " posterior samples"), col = "Geography") +
   theme(legend.position = c(0.2,0.7))  -> plot_fit_time_geog
 
-png(here::here("figures",measure,"temp_fit_all.png"), height = 1000, width = 1500, res = 150)
+png(here::here("figures",measure,"fit_total_geog.png"), height = 1000, width = 1500, res = 200)
 plot_fit_time / plot_fit_time_geog
 dev.off()
 
@@ -133,12 +133,6 @@ agg_sims <- dat_sims_long[,.(q05 = quantile(pred_n, 0.05),
 calc_inc <- function(x) x*1e5/agg_sims$la_pop
 agg_sims_plot <- mutate(agg_sims, across(q05:obs, calc_inc))
 
-# ggplot(as.data.frame(agg_sims), aes(week, q50)) +
-#   geom_ribbon(aes(ymin = q01, ymax = q99), alpha = 0.5) +
-#   geom_ribbon(aes(ymin = q10, ymax = q90), alpha = 0.5) +
-#   geom_line() +
-#   facet_wrap(~lad19nm)
-
 la_samp <- sample(dat$lad19cd, 6)
 ggplot(as.data.frame(agg_sims), aes(x = week)) + #[lad19cd %in% la_samp]
   geom_ribbon(aes(ymin = q05, ymax = q95), alpha = 0.2, fill = "steelblue") +
@@ -151,7 +145,7 @@ ggplot(as.data.frame(agg_sims), aes(x = week)) + #[lad19cd %in% la_samp]
        title = "Total fit over time, by calendar week", 
        subtitle = paste0("Observed rates shown in black, with 50-90% quantiles over ", nsims, " posterior samples")) -> plot_fit_la
 
-png(here::here("figures",measure,"temp_fit_lasamp.png"), height = 1000, width = 1500, res = 150)
+png(here::here("figures",measure,"fit_lasamp.png"), height = 1000, width = 1500, res = 200)
 plot_fit_la
 dev.off()
 
