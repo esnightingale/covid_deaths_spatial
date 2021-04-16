@@ -15,29 +15,19 @@ library(data.table)
 library(tidyverse)
 library(dtplyr)
 
-dat <- readRDS(here::here("data","expanded","deaths.rds"))
+dat <- readRDS(here::here("data","deaths.rds"))
 dat <- dat[[wave]] 
 # dat$n[dat$wk_since_first < 0] <- NA
 
-# Setup adjusted prediction data
-setDF(dat) %>%
-  mutate(prop_minority = median(prop_minority),
-         IMD_quint = "(21.3,29.2]",
-         E_wk = E_wk_unstrat,
-         n = NA)  -> dat_avgcov
-
-# Make pred data with average covariate values
-dat_pred <- dplyr::bind_rows(dat, dat_avgcov) %>%
-  dplyr::mutate(IMD_quint = factor(IMD_quint, levels = levels(dat$IMD_quint)))
-
-pred_avgcov <- readRDS(here::here("output","fit_samples_expanded_avgcov.rds"))
+pred_avgcov <- readRDS(here::here("output","fit_samples_avgcov.rds"))
 fit_pred <- pred_avgcov$fit
 samples_pred <- pred_avgcov$samples
+dat_pred <- pred_avgcov$dat
 
-sims <- as.data.table(dplyr::bind_cols(lapply(samples_pred, get_preds, dat_pred)))
-saveRDS(sims, file = here::here("output","sims_expanded_avgcov.rds"))
+# sims <- as.data.table(dplyr::bind_cols(lapply(samples_pred, get_preds, dat_pred)))
+# saveRDS(sims, file = here::here("output","sims_avgcov.rds"))
 
-sims <- readRDS(file = here::here("output","sims_expanded_avgcov.rds"))
+sims <- readRDS(file = here::here("output","sims_avgcov.rds"))
 data.table::setDT(sims)
 
 cases <- readRDS(here::here("data","cases.rds"))[[1]] %>%
@@ -49,6 +39,8 @@ cases <- readRDS(here::here("data","cases.rds"))[[1]] %>%
 
 nsims <- ncol(sims)
 idx <- -1:-(nrow(sims)/2)
+
+names(sims)[1:nsims] <- 1:nsims
 
 sims <- sims[idx]
 sims$week <- dat$week
