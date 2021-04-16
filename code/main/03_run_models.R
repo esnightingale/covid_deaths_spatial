@@ -178,6 +178,9 @@ f_bym_geog <- n ~
 formulae <- list(base = f_base, base_geog = f_base_geog, iid = f_iid, iid_geog = f_iid_geog, BYM = f_bym, BYM_geog = f_bym_geog) #, BYM_geog_nocovs = f_bym_geog_nocovs
 fits <- lapply(formulae, fit_mod, dat, expected = expected)
 
+# Check failed cpo values
+lapply(fits, function(f) summary(f$cpo$failure))
+
 saveRDS(fits, file = here::here("output",sprintf("fits_%s_%s.rds",measure, wave)))
 
 # Just final model

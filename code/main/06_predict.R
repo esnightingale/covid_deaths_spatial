@@ -24,7 +24,7 @@ g <- inla.read.graph(filename = paste0(datadir,"maps/regions_eng.adj"))
 
 # LTLA-week-aggregated observed deaths, expected deaths and LTLA covariates
 # (first and second waves)
-dat_all <- readRDS(here::here("data","expanded",paste0(measure,".rds")))
+dat_all <- readRDS(here::here("data",paste0(measure,".rds")))
 
 dat <- dat_all[[wave]] 
 dat$n[dat$wk_since_first < 0] <- NA
@@ -34,10 +34,10 @@ period <- dat_all$breaks[[wave]]
 nsims <- 1000
 
 # Fitted models and posterior samples
-fits <- readRDS(file = here::here("output","expanded_data",
+fits <- readRDS(file = here::here("output",
                                   sprintf("fits_%s_%s.rds",measure, wave)))
 fit_final <- fits[[6]]
-samples <- readRDS(file = here::here("output","expanded_data",
+samples <- readRDS(file = here::here("output",
                                      sprintf("samples_%s_%s.rds",measure, wave)))
 samples_final <- samples[[6]]
 
@@ -83,7 +83,7 @@ prior.prec.tp
 #   PREDICTION AT ALL TIME POINTS    #
 ######################################
 
-samples_final <- inla.posterior.sample(fit_final, n = nsims)
+# samples_final <- inla.posterior.sample(fit_final, n = nsims)
 
 sims <- as.data.table(bind_cols(lapply(samples_final, get_preds, dat)))
 
@@ -159,9 +159,12 @@ dev.off()
 #  PREDICTION AT AVERAGE COVARIATES  #
 ######################################
 
+median(dat$IMD)
+levels(dat$IMD_quint)
+
 setDF(dat) %>%
   mutate(prop_minority = median(prop_minority),
-         IMD_quint = "(21.3,29.2]",
+         IMD_quint = "(12.3,20]",
          E_wk = E_wk_unstrat,
          n = NA)  -> dat_avgcov
 
@@ -202,4 +205,4 @@ summary(fit_pred)
 # Samples are of *marginal* densities
 samples_pred <- inla.posterior.sample(n = nsims, fit_pred)
 
-saveRDS(list(fit = fit_pred, samples = samples_pred), file = here::here("output","fit_samples_expanded_avgcov.rds"))
+saveRDS(list(fit = fit_pred, samples = samples_pred, dat = dat_pred), file = here::here("output","fit_samples_avgcov.rds"))

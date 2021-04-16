@@ -51,17 +51,17 @@ nsims <- length(samples_final)
 # All parameter posteriors
 
 pdf(here::here("figures",measure,"parms_fixed.pdf"))
-lapply(names(fit_final$marginals.fixed), plot_parm, opt = 1)
+lapply(names(fit_final$marginals.fixed), plot_parm, fit = fit_final, opt = 1)
 dev.off()
 pdf(here::here("figures",measure,"parms_hyper.pdf"))
-lapply(names(fit_final$marginals.hyperpar), plot_parm, opt = 2)
+lapply(names(fit_final$marginals.hyperpar), fit = fit_final, plot_parm, opt = 2)
 dev.off()
 
 # ---------------------------------------------------------------------------- #
 # Fixed effects
 
 # IMD quintiles
-post_fixed <- lapply(fit_final$marginals.fixed[[-6]], function(x) inla.tmarginal(exp, x)) 
+post_fixed <- lapply(fit_final$marginals.fixed, function(x) inla.tmarginal(exp, x)) 
 lapply(post_fixed, inla.zmarginal)
 
 # Prop minority (rescale to %)
@@ -72,12 +72,21 @@ get_coeffs(fit_final)
 png(here::here("figures",measure,"covariates_final.png"), height = 800, width = 1000, res = 150)
 # tiff(filename = "./figures/final_altdata/map_resids.tif", height = 600, width = 1000)
 
-fit_final$summary.fixed[-1,] %>% #rep_BYM
-  rownames_to_column(var = "Covariate") %>%
-  ggplot(aes(x = Covariate, y = mean,  ymin = `0.025quant`, ymax = `0.975quant`)) +
+# fit_final$summary.fixed[-1,] %>% #rep_BYM
+#   rownames_to_column(var = "Covariate") %>%
+#   ggplot(aes(x = Covariate, y = mean,  ymin = `0.025quant`, ymax = `0.975quant`)) +
+#   geom_pointrange() +
+#   geom_hline(aes(yintercept = 0), lty = "dashed",col = "red") +
+#   labs(y = "Estimate") 
+#   
+fit_final %>% 
+  get_coeffs() %>% 
+  slice(-1) %>%
+  ggplot(aes(x = effect, y = mean,  ymin = `quant0.025`, ymax = `quant0.975`)) +
   geom_pointrange() +
-  geom_hline(aes(yintercept = 0), lty = "dashed",col = "red") +
-  labs(y = "Estimate") 
+  geom_hline(aes(yintercept = 1), lty = "dashed",col = "red") +
+  labs(y = "Estimate") +
+  theme(axis.text.x = element_text(angle = 45, vjust =0.6))
 dev.off()
 
 # ---------------------------------------------------------------------------- #
@@ -136,8 +145,25 @@ sp_re %>%
   pull(lad19cd) %>%
   unique() -> hi_IID
 
+plot_la_fit <- function(id){
+  dat %>%
+    bind_cols(fit_final$summary.fitted.values) %>%
+    filter(lad19cd %in% id) %>%
+    ggplot(aes(week, `0.5quant`)) +
+    geom_ribbon(aes(ymin = `0.025quant`, ymax = `0.975quant`), alpha = 0.2, fill = "steelblue") +
+    geom_line(col = "steelblue") +
+    geom_point(aes(y = n/E_wk), cex = 0.5) + 
+    facet_wrap(~lad19nm, scales = "free") +
+    labs(x = "Calendar week", 
+         y = "Observed/Expected", 
+         title = "Model fit over time, by calendar week", 
+         subtitle = "Observed rates shown in black, with 50-95% posterior quantiles") %>%
+    return()
+}
+  
+plot_la_fit(hi_IID)
 png(here::here("figures",measure,"ltla_hi_IID.png"), height = 1200, width = 1200, res = 200)
-plot_fit_la(as.data.frame(agg_sims[lad19cd %in% hi_IID]))
+plot_la_fit(hi_IID)
 dev.off()
 
 ## Lowest IID effects
@@ -148,10 +174,8 @@ sp_re %>%
   unique() -> low_IID
 
 png(here::here("figures",measure,"ltla_lo_IID.png"), height = 1200, width = 1200, res = 200)
-plot_fit_la(as.data.frame(agg_sims[lad19cd %in% low_IID]))
+plot_la_fit(low_IID)
 dev.off()
-
-
 
 # ---------------------------------------------------------------------------- #
 # Posterior predictions
@@ -223,8 +247,10 @@ plot_fit_la <- function(plotdata){
          subtitle = paste0("Observed rates shown in black, with 50-90% quantiles over ", nsims, " posterior samples")) %>%
     return()
 }
+
+la_samp <- sample(unique(dat$lad19nm),9)
 png(here::here("figures",measure,"fit_lasamp.png"), height = 1000, width = 1500, res = 200)
-plot_fit_la(as.data.frame(agg_sims[la %in% la_samp]))
+plot_fit_la(as.data.frame(agg_sims[lad19nm %in% la_samp]))
 dev.off()
 
 pdf(here::here("figures",measure,"fit_all_ltlas.pdf"), height = 25, width = 25)
@@ -250,7 +276,8 @@ dat$UL <- fit_final$summary.fitted.values[, "0.975quant"]
 
 dat_la <- dat %>%
   group_by(lad19cd) %>%
-  summarise(Median = mean(RR, na.rm = TRUE), Lower = mean(LL, na.rm = TRUE), Upper = mean(UL, na.rm = TRUE)) 
+  summarise(Median = mean(RR, na.rm = TRUE), Lower = mean(LL, na.rm = TRUE), Upper = mean(UL, na.rm = TRUE)) %>%
+  as.data.frame()
 
 png(here::here("figures",measure,"fitted_RR_CrI.png"), height = 1000, width = 1800, res = 200)
 regions %>%
