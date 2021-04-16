@@ -15,6 +15,38 @@ datadir <- "C:/Users/phpuenig/Documents/COVID-19/Data/"
 
 ################################################################################
 
+health <- readxl::read_xlsx(paste0(datadir,"covariates/PHE_localhealth_indicators.xlsx"), sheet = "Data", skip = 3) %>% 
+  as_tibble() %>%
+  rename(lad19nm = Label, lad19cd = Code)
+  
+health$lad19nm[health$lad19nm %in% c("Aylesbury Vale","Chiltern", "South Bucks", "Wycombe")] <- "Buckinghamshire"
+health$lad19nm[health$lad19nm == "Shepway"] <- "Folkestone and Hythe"
+health$lad19nm[health$lad19nm %in% c("Bournemouth","Christchurch", "Poole")] <- "Bournemouth, Christchurch and Poole"
+health$lad19nm[grepl("Dorset", health$lad19nm) | health$lad19nm %in% c("Weymouth and Portland","Purbeck")] <- "Dorset"
+health$lad19nm[health$lad19nm %in% c("Forest Heath","St Edmundsbury")] <- "West Suffolk"
+health$lad19nm[health$lad19nm %in% c("Waveney","Suffolk Coastal")] <- "East Suffolk"
+health$lad19nm[health$lad19nm %in% c("West Somerset","Taunton Deane")] <- "Somerset West and Taunton"
+health$lad19nm[health$lad19nm == "City of London"] <- "Westminster"
+
+health <- health %>% 
+  group_by(lad19nm) %>% 
+  summarise(across(c(`Total population`,`Older People in Deprivation, Number`), 
+                   sum),
+            across(starts_with(c("Emergency","Limiting","Incidence","Population",
+                                 "Index","Deaths","Black","Older","Healthy","Low")), 
+                               mean)) %>%
+  rename(older_depr_n = `Older People in Deprivation, Number`,
+         adm_chd = `Emergency hospital admissions for CHD`,
+         adm_copd = `Emergency hospital admissions for Chronic Obstructive Pulmonary Disease (COPD)`,
+         LTI_disability = `Limiting long-term illness or disability`, 
+         lung_cancer = `Incidence of lung cancer`,
+         pop_nonwhite = `Population whose ethnicity is not 'White UK'`,
+         death_all = `Deaths from all causes, all ages`, 
+         life_exp_m = `Healthy life expectancy for males, 2009-2013`,
+         life_exp_f = `Healthy life expectancy for females, 2009-2013`)
+
+saveRDS(health, paste0(datadir,"health_indicators.rds"))
+
 ## Health workers (census 2011)
 kw <- readxl::read_xlsx(paste0(datadir,"covariates/keyworkersreferencetableupdated.xlsx"), sheet = "Table 19", range = "A5:C383") %>% #View()
   as_tibble() %>%

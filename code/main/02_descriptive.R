@@ -114,6 +114,87 @@ png(here::here("figures","descriptive","map_covariates3.png"), height = 600, wid
 dev.off()
 
 
+# Health indicators
+
+# regions %>%
+#   left_join(health) %>%
+#   pivot_longer(c("older_depr_n",
+#                  "adm_chd",
+#                  "adm_copd",
+#                  "LTI_disability", 
+#                  "lung_cancer",
+#                  "pop_nonwhite",
+#                  "death_all", 
+#                  "life_exp_m",
+#                  "life_exp_f")) %>%
+#   group_by(name) %>%
+#   mutate(value = (value - mean(value))/sd(value)) -> regions_wHI
+# 
+# map_health <-
+#   basic_map(regions_wHI, fill = "value", scale = F) +
+#   facet_wrap(~name) +
+#   labs(fill = "") 
+# ggsave(here::here(figdir,"map_health.pdf"), map_health, device = "pdf", height = 30, width = 30, units = "in")
+
+# ---------------------------------------------------------------------------- #
+
+## DEATHS BY TYPE ##
+
+linelist_deaths %>%
+  ggplot(aes(week, fill = death_type2))+
+    geom_bar() +
+    labs(x = "Week",y = "Count",title = "Weekly COVID-19-related deaths, by confirmation with positive test",
+         fill = "") +
+    theme_minimal() +
+    theme(legend.position = c(0.7, 0.8)) -> deaths_by_conf
+ggsave(here::here(figdir,"deaths_by_labconf.png"), deaths_by_conf, device = "png", height = 12, width = 18, units = "cm")
+
+linelist_deaths %>%
+  group_by(week, death_type2) %>%
+  count() %>%
+  pivot_wider(names_from = death_type2, values_from = n) %>% 
+  mutate(prop_conf = `Lab confirmed`/(`Lab confirmed` + `Not lab confirmed`)) %>% 
+  ggplot(aes(week, prop_conf)) +
+  geom_line() +
+  geom_hline(yintercept = 1, lty = "dashed") +
+  labs(x = "Week", y = "Proportion", title = "Proportion of COVID-19-related deaths confirmed by positive test result") +
+  theme_minimal() -> prop_conf
+
+ggsave(here::here(figdir,"prop_labconf.png"), prop_conf, device = "png", height = 12, width = 18, units = "cm")
+
+# ---------------------------------------------------------------------------- #
+
+## CASES BY PILLAR ##
+
+linelist_cases %>%
+  mutate(pillar = stringr::str_replace(pillar, "_"," ")) %>%
+  ggplot(aes(week, fill = pillar))+
+  geom_bar() +
+  labs(x = "Week",y = "Count",title = "Weekly confirmed COVID-19 cases, by pillar",
+       fill = "") +
+  theme_minimal() +
+  theme(legend.position = c(0.2, 0.8)) -> cases_by_pillar
+ggsave(here::here(figdir,"cases_by_pillar.png"), cases_by_pillar, device = "png", height = 12, width = 18, units = "cm")
+
+linelist_cases %>%
+  group_by(week, pillar) %>%
+  count() %>%
+  pivot_wider(names_from = pillar, values_from = n) %>% 
+  mutate(prop_p2 = pillar_2/(pillar_1 + pillar_2)) %>% 
+  ggplot(aes(week, prop_p2)) +
+  geom_line() +
+  geom_hline(yintercept = 1, lty = "dashed") +
+  labs(x = "Week", y = "Proportion", title = "Proportion of COVID-19 cases confirmed by Pillar 2 testing") +
+  theme_minimal() -> prop_p2
+
+ggsave(here::here(figdir,"prop_p2.png"), prop_p2, device = "png", height = 12, width = 18, units = "cm")
+
+linelist_cases %>%
+  group_by(week, pillar) %>%
+  count() %>%
+  pivot_wider(names_from = pillar, values_from = n) %>% 
+  mutate(prop_p2 = pillar_2/(pillar_1 + pillar_2)) %>% View()
+
 # ---------------------------------------------------------------------------- #
 
 ## MORTALITY BY COVARIATES ##
@@ -317,8 +398,13 @@ deaths[[1]] %>%
        colour = "Geography type") +
   geom_vline(xintercept = ymd("2020-03-23"), lty = "dashed", lwd = 0.2) +
   annotate("text", x = ymd("2020-03-22"), y = 15, label = "National lockdown enforced", cex = 2, hjust = "right") +
-  theme(legend.position = c(0.16,0.60), legend.text=element_text(size=8),  legend.title=element_text(size=8)) +
-  xlim(period) -> ts_geog_deaths
+  scale_x_date(date_minor_breaks = "1 week", 
+               date_breaks = "1 month",
+               date_labels = "%b",
+               limits = period) +
+  theme(legend.position = c(0.16,0.60), 
+        legend.text=element_text(size=8),  
+        legend.title=element_text(size=8)) -> ts_geog_deaths
 
 cases[[1]] %>%
   group_by(w,week,geography) %>%
@@ -342,7 +428,10 @@ cases[[1]] %>%
        x = "Calendar week",
        y = "Rate per 100,000") +
   guides(col = FALSE) +
-  xlim(period) -> ts_geog_cases
+  scale_x_date(date_minor_breaks = "1 week", 
+               date_breaks = "1 month",
+               date_labels = "%b",
+               limits = period) -> ts_geog_cases
 
 png(here::here(figdir,"ts_geog.png"), height = 1000, width = 1500, res = 150)
 ts_geog_deaths / ts_geog_cases
@@ -374,131 +463,135 @@ ts_ltla_deaths
 dev.off()
 
 # ---------------------------------------------------------------------------- #
-## DEATHS:CASES RATIO ##
+## OBSERVED DEATHS:CASES RATIO ##
 
-calc_ratio <- function(deaths, cases, lag, cutoff = 1){
-  
-deaths %>%
-  mutate(week = week-lag) %>%  
-  inner_join(dplyr::select(cases,lad19cd,geography,week,n), by = c("lad19cd","week","geography"), suffix = c("_d","_c")) %>%
-  mutate(CFR = n_c/n_d,
-         period = case_when(week < ymd("2020-05-18") ~ 1,
-                                      week >= ymd("2020-05-18") ~ 2)) %>%
-  group_by(geography) %>%
-  mutate(scale = median(CFR)) %>%
-  ungroup() -> ratio
-
-ratio$CFR[ratio$n_d < cutoff | ratio$n_c < cutoff] <- NA
-
-ratio %>% 
-  summarise(med = median(CFR, na.rm = TRUE),
-            q1 = quantile(CFR, p = 0.25, na.rm = TRUE),
-            q3 = quantile(CFR, p = 0.75, na.rm = TRUE)) %>%
-  print()
-
-ratio %>% 
-  group_by(period) %>%
-  summarise(med = median(CFR, na.rm = TRUE),
-            q1 = quantile(CFR, p = 0.25, na.rm = TRUE),
-            q3 = quantile(CFR, p = 0.75, na.rm = TRUE)) %>%
-  print()
-
-
-ratio %>% 
-  group_by(geography,period) %>%
-  summarise(med = median(CFR, na.rm = TRUE),
-            q1 = quantile(CFR, p = 0.25, na.rm = TRUE),
-            q3 = quantile(CFR, p = 0.75, na.rm = TRUE)) %>%
-  print()
-
-
-ratio %>% 
-  group_by(period) %>% 
-  summarise(min = lad19nm[which.min(CFR)],
-            max = lad19nm[which.max(CFR)])
-
-## Ratio per LTLA
-ratio %>%
-  group_by(lad19cd, period) %>%
-  summarise(n_d = sum(n_d, na.rm = T),
-            n_c = sum(n_c, na.rm = T),
-            CFR = median(CFR, na.rm = T)) %>%
-  ungroup() %>%
-  full_join(data.frame(lad19cd = unique(regions$lad19cd), period = 1:2))-> ratio_la
-
-print(summary(ratio_la$CFR))
-print(summary(ratio_la$CFR[ratio_la$period == 1]))
-print(summary(ratio_la$CFR[ratio_la$period == 2]))
-
-regions %>%
-  full_join(ratio_la) %>%
-  mutate(period = factor(period,labels = c("2020-01-04 - 2020-05-17","2020-05-18 - 2020-06-28"))) %>%
-  basic_map(fill = "CFR", scale = F) +
-  scale_fill_viridis_c(trans = "log2") +
-  facet_wrap(~period, ncol = 2) +
-  labs(title = "",
-       # subtitle = paste(lag,"day lag"),
-       fill = "Ratio",
-       caption = paste("Ratios where no. deaths or no. cases <", cutoff,"are not calculated")) -> maps
-
-ggplot(ratio, aes(week, CFR)) + 
-  geom_jitter(alpha = 0.1) +
-  geom_smooth(fill = "steelblue", col = "steelblue", method = "loess") +
-  scale_y_continuous(trans = "log2") +
-  geom_vline(xintercept = ymd("2020-05-18"), col = "indianred") +
-  annotate("text", x = ymd("2020-05-19"), y = 0.25, label = "P2 available to all symptomatic cases", cex = 2, hjust = "left") +
-  geom_vline(xintercept = ymd("2020-04-15"), col = "indianred") +
-  annotate("text", x = ymd("2020-04-16"), y = 0.15, label = "P2 available to care home residents and staff", cex = 2, hjust = "left") +
-  labs(x = "", y = "Observed CFR") -> time
-
-png(here::here("figures","compare",paste0("map_obs_cfr_",lag,".png")), height = 1000, width = 1500, res = 200)
-print(
-maps #+ plot_annotation(title = 'Observed ratio of cases to deaths before and after expansion of Pillar 2 testing')
-)
-dev.off()
-
-png(here::here("figures","compare",paste0("time_obs_cfr_",lag,".png")), height = 800, width = 1200, res = 150)
-print(time)
-dev.off()
-
-return(ratio)
-
-}
-
-ratio_7 <- calc_ratio(deaths[[1]], cases[[1]], 7, 1)
-ratio_14 <- calc_ratio(deaths[[1]], cases[[1]], 14, 1)
-
-ratio_7 %>%
-  group_by(geography, period) %>%
-  summarise(n_d = sum(n_d, na.rm = T),
-            n_c = sum(n_c, na.rm = T),
-            CFR_obs = n_c/n_d) %>%
-  group_by(geography, period) %>%
-  summarise(scale = unique(scale)) -> geog_scale7
-
-geog_scale7
-# geography_d               scale
-# <chr>                     <dbl>
-#   1 London Borough            0.2  
-# 2 Metropolitan District     0.167
-# 3 Non-metropolitan District 0.231
-# 4 Unitary Authority         0.189
+# # distribution weighted by number of observed deaths 
+# calc_ratio <- function(deaths, cases, lag, cutoff = 1){
+#   
+#   deaths %>%
+#     mutate(n = replace_na(n, 0),
+#            week = week-lag) %>%
+#     full_join(dplyr::select(cases,lad19nm,geography,week,n), by = c("lad19nm","week","geography"), suffix = c("_d","_c")) %>% 
+#     mutate(CFR = n_c/n_d,
+#            wt = round(n_d*100000/sum(n_d, na.rm = T)),
+#            period = case_when(week < ymd("2020-05-18") ~ 1,
+#                               week >= ymd("2020-05-18") ~ 2)) %>% 
+#     filter(is.finite(CFR) & CFR > 0) %>%
+#     group_by(lad19cd, lad19nm, geography, week, period, CFR) %>% 
+#     tidyr::expand(wt = seq(1:wt)) %>%
+#     ungroup() -> ratio
 # 
-ratio_14 %>%
-  group_by(geography, period) %>%
-  summarise(n_d = sum(n_d, na.rm = T),
-            n_c = sum(n_c, na.rm = T),
-            CFR_obs = n_d/n_c) %>%
-group_by(geography, period) %>%
-  summarise(scale = unique(scale)) -> geog_scale14
-
-geog_scale14
-# geography_d               scale
-# <chr>                     <dbl>
-#   1 London Borough            0.2  
-# 2 Metropolitan District     0.167
-# 3 Non-metropolitan District 0.231
-# 4 Unitary Authority         0.189
+# # ratio$CFR[ratio$n_d < cutoff | ratio$n_c < cutoff] <- NA
+# 
+# ratio %>% 
+#   summarise(med = median(CFR, na.rm = TRUE),
+#             q1 = quantile(CFR, p = 0.25, na.rm = TRUE),
+#             q3 = quantile(CFR, p = 0.75, na.rm = TRUE)) %>%
+#   print()
+# 
+# ratio %>% 
+#   group_by(period) %>%
+#   summarise(med = median(CFR, na.rm = TRUE),
+#             q1 = quantile(CFR, p = 0.25, na.rm = TRUE),
+#             q3 = quantile(CFR, p = 0.75, na.rm = TRUE)) %>%
+#   print()
+# 
+# 
+# ratio %>% 
+#   group_by(geography,period) %>%
+#   summarise(med = median(CFR, na.rm = TRUE),
+#             q1 = quantile(CFR, p = 0.25, na.rm = TRUE),
+#             q3 = quantile(CFR, p = 0.75, na.rm = TRUE)) %>%
+#   print()
+# 
+# 
+# ratio %>% 
+#   group_by(period) %>% 
+#   summarise(min = lad19nm[which.min(CFR)],
+#             max = lad19nm[which.max(CFR)])
+# 
+# ## Ratio per LTLA
+# ratio %>%
+#   group_by(lad19cd, period) %>%
+#   summarise(n_d = sum(n_d, na.rm = T),
+#             n_c = sum(n_c, na.rm = T),
+#             CFR = median(CFR, na.rm = T)) %>%
+#   ungroup() %>%
+#   full_join(data.frame(lad19cd = unique(regions$lad19cd), period = 1:2))-> ratio_la
+# 
+# print(summary(ratio_la$CFR))
+# print(summary(ratio_la$CFR[ratio_la$period == 1]))
+# print(summary(ratio_la$CFR[ratio_la$period == 2]))
+# 
+# regions %>%
+#   full_join(ratio_la) %>%
+#   mutate(period = factor(period,labels = c("2020-01-04 - 2020-05-17","2020-05-18 - 2020-06-28"))) %>%
+#   basic_map(fill = "CFR", scale = F) +
+#   scale_fill_viridis_c(trans = "log2") +
+#   facet_wrap(~period, ncol = 2) +
+#   labs(title = "",
+#        # subtitle = paste(lag,"day lag"),
+#        fill = "Ratio",
+#        caption = paste("Ratios where no. deaths or no. cases <", cutoff,"are not calculated")) -> maps
+# 
+# ggplot(ratio, aes(week, CFR)) + 
+#   geom_jitter(alpha = 0.1) +
+#   geom_smooth(fill = "steelblue", col = "steelblue", method = "loess") +
+#   scale_y_continuous(trans = "log2") +
+#   geom_vline(xintercept = ymd("2020-05-18"), col = "indianred") +
+#   annotate("text", x = ymd("2020-05-19"), y = 0.25, label = "P2 available to all symptomatic cases", cex = 2, hjust = "left") +
+#   geom_vline(xintercept = ymd("2020-04-15"), col = "indianred") +
+#   annotate("text", x = ymd("2020-04-16"), y = 0.15, label = "P2 available to care home residents and staff", cex = 2, hjust = "left") +
+#   labs(x = "", y = "Observed CFR") -> time
+# 
+# png(here::here("figures","compare",paste0("map_obs_cfr_",lag,".png")), height = 1000, width = 1500, res = 200)
+# print(
+# maps #+ plot_annotation(title = 'Observed ratio of cases to deaths before and after expansion of Pillar 2 testing')
+# )
+# dev.off()
+# 
+# png(here::here("figures","compare",paste0("time_obs_cfr_",lag,".png")), height = 800, width = 1200, res = 150)
+# print(time)
+# dev.off()
+# 
+# return(ratio)
+# 
+# }
+# 
+# ratio_7 <- calc_ratio(deaths[[1]], cases[[1]], 7)
+# ratio_14 <- calc_ratio(deaths[[1]], cases[[1]], 14)
+# 
+# ratio_7 %>%
+#   group_by(geography, period) %>%
+#   summarise(n_d = sum(n_d, na.rm = T),
+#             n_c = sum(n_c, na.rm = T),
+#             CFR_obs = n_c/n_d) %>%
+#   group_by(geography, period) %>%
+#   summarise(scale = unique(scale)) -> geog_scale7
+# 
+# geog_scale7
+# # geography_d               scale
+# # <chr>                     <dbl>
+# #   1 London Borough            0.2  
+# # 2 Metropolitan District     0.167
+# # 3 Non-metropolitan District 0.231
+# # 4 Unitary Authority         0.189
+# # 
+# ratio_14 %>%
+#   group_by(geography, period) %>%
+#   summarise(n_d = sum(n_d, na.rm = T),
+#             n_c = sum(n_c, na.rm = T),
+#             CFR_obs = n_d/n_c) %>%
+# group_by(geography, period) %>%
+#   summarise(scale = unique(scale)) -> geog_scale14
+# 
+# geog_scale14
+# # geography_d               scale
+# # <chr>                     <dbl>
+# #   1 London Borough            0.2  
+# # 2 Metropolitan District     0.167
+# # 3 Non-metropolitan District 0.231
+# # 4 Unitary Authority         0.189
 
 # ---------------------------------------------------------------------------- #
 
@@ -537,5 +630,20 @@ linelist_deaths %>%
   xlim(c(0,100))
 dev.off()
 
+png(here::here("figures","descriptive","swab_death_lag_bypillar.png"), height = 800, width = 1000, res = 150)
+linelist_deaths %>% 
+  filter(swab_death >= 0 & date_swab >= ymd("2020-05-18") & pillars %in% c("pillar1", "pillar2")) %>%
+  ggplot(aes(x = swab_death)) + 
+  geom_histogram(bins = 40, fill = "steelblue") +
+  facet_wrap(~pillars) +
+  labs(x = "Days from swab to death", y = "Density") + 
+  xlim(c(0,100))
+dev.off()
+
+linelist_deaths %>%
+  group_by(pillars) %>%
+  summarise(mean = mean(swab_death, na.rm = T),
+            sd = sqrt(var(swab_death, na.rm = T)),
+            quants = paste0(quantile(swab_death, c(0.05,0.25,0.5,0.75,0.95), na.rm = T),collapse = "-"))
 
 # ---------------------------------------------------------------------------- #
