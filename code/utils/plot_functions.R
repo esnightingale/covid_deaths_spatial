@@ -215,10 +215,10 @@ plot_epi_time <- function(data, wave = 1, measure){
   
 }
 
-plot_parm <- function(parm, opt = 1){
+plot_parm <- function(parm, fit, opt = 1){
   
-  if (opt == 1){ d <- fit_final_d$marginals.fixed[[parm]]
-  }else{ d <- fit_final_d$marginals.hyperpar[[parm]] }
+  if (opt == 1){ d <- fit$marginals.fixed[[parm]]
+  }else{ d <- fit$marginals.hyperpar[[parm]] }
   
   print(
     ggplot(data.frame(inla.smarginal(d)), aes(x, y)) +
