@@ -10,16 +10,22 @@
 
 setup_analysis_data <- function(alldata, 
                                 measure,
-                                start = ymd("2020-03-01"), 
-                                end = ymd("2020-08-01")){
+                                start = ymd("2020-01-01"), 
+                                end = ymd("2020-06-30")){
 
+# start = ymd("2020-01-01")
+# end = ymd("2020-06-30")
+
+week_seq <- ymd(seq(start, end, by = "week"))
+week_seq
   
 alldata_sub <- alldata %>%
-    filter(date >= start & date <= end)
-
+    filter(between(date, start, end))
+  
 # --------------------------------------------------------------------------------------------#
 
-## Calculate age-stratified expected counts
+## Calculate age-stratified expected counts, according to rates over specified 
+## time period
 
 la_pops <- calc_E(alldata_sub)
 
@@ -30,7 +36,6 @@ ltla_first <- alldata_sub %>%
   dplyr::select(lad19cd, ltla_first) %>%
   unique()
 
-week_seq <- ymd(seq(min(alldata_sub$week), max(alldata_sub$week), by = "week"))
 expand <- data.frame(week = rep(week_seq, n_distinct(alldata_sub$lad19cd)),
                       lad19cd = rep(unique(alldata_sub$lad19cd), each = length(week_seq))) %>%
   full_join(ltla_first) %>%
@@ -48,7 +53,6 @@ alldata_sub %>%
   mutate(n = replace_na(n, 0),
          w = as.integer(lubridate::week(week))) %>%
   arrange(lad19cd, week) -> d_agg_wk
-
 
 # Aggregate by LA overall
 alldata_sub %>%
@@ -70,15 +74,15 @@ dat <- d_agg_wk %>%
   rename(E = la_tot_E,
          E_wk = la_wk_E,
          E_wk_unstrat = la_unstrat_wk_E) %>%
-  mutate(first = lubridate::week(lubridate::floor_date(ltla_first, unit = "week")),
+  mutate(first = lubridate::floor_date(ltla_first, unit = "week", week_start = 3),
          first_overall = min(first),
          date_first_overall = min(ltla_first, na.rm = T)) %>%
   mutate(n = replace_na(n, 0),
          geog = as.numeric(as.factor(geography)),
-         wk_since_first = w - first,
-         wk_first_la_overall = first - first_overall,
+         wk_since_first = as.numeric(lubridate::interval(first,week), "weeks"),
+         wk_first_la_overall = as.numeric(lubridate::interval(first_overall,first), "weeks"),
          pop_dens = la_pop/area_km2,
-         IMD_quint = cut(IMD, 5)) %>% 
+         IMD_quint = cut(IMD, 5)) %>%  
   dplyr::select(n, E, E_wk, E_wk_unstrat, w, week, lad19cd, lad19nm, la_pop, geog, geography, area_km2, pop_dens,
                 first, wk_since_first, first_overall, wk_first_la_overall, med_age, IMD, IMD_quint, prop_minority, prop_kw) %>%
   mutate(w2 = w, w3 = w, SIR = n/E) 

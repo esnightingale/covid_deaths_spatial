@@ -47,7 +47,7 @@ linelist %>%
   mutate_at(vars(date_report, date), lubridate::ymd) %>%
   filter(!is.na(age), !is.na(date)) %>% 
   mutate(result_delay = as.integer(difftime(date_report, date, units = "days")),
-         week = lubridate::floor_date(date, unit = "week"),
+         week = lubridate::floor_date(date, unit = "week", week_start = 3),
          age_group = as.character(cut(age, breaks = c(0,seq(10,90,10),120), right = FALSE))) %>%
   group_by(lad19cd) %>%
   mutate(ltla_first = min(date, na.rm = T)) %>%
@@ -58,9 +58,6 @@ linelist %>%
 alldata$age_group[alldata$age_group == "[90,120)"] <- "[90,NA)"
 alldata$age_group <- as.factor(alldata$age_group)
 summary(alldata$age_group)
-
-# Include cases from 2020 onwards
-# alldata <- filter(alldata, date > ymd("2020-01-01"))
 
 saveRDS(alldata,paste0(datadir,"linelist_cases.rds"))
 

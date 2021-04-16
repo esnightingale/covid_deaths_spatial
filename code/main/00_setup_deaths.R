@@ -46,13 +46,15 @@ covid_deaths %>%
   filter(!is.na(age) & !is.na(date)) %>% 
   mutate(swab_death = as.integer(difftime(date, date_swab, units = "days")),
          report_delay = as.integer(difftime(date_report, date, units = "days")),
-         week = lubridate::floor_date(date, unit = "week"),
+         death_type2 = factor(case_when(death_type == "lab_confirmed" ~ "Lab confirmed",
+                                        grepl("not_lab",death_type) ~ "Not lab confirmed")),
+         week = lubridate::floor_date(date, unit = "week", week_start = 3),
          age_group = as.character(cut(age, breaks = c(0,seq(10,90,10),120), right = FALSE))) %>%
   group_by(lad19cd) %>%
   mutate(ltla_first = min(date, na.rm = T)) %>%
   ungroup() %>%
   arrange(age) %>%
-  dplyr::select(lad19cd, ltla_name, ltla_first, week, date, date_report, date_swab, swab_death, report_delay, age_group) -> alldata
+  dplyr::select(lad19cd, ltla_name, ltla_first, week, date, date_report, pillars, date_swab, swab_death, report_delay, age_group, death_type, death_type2) -> alldata
 
 alldata$age_group[alldata$age_group == "[90,120)"] <- "[90,NA)"
 alldata$age_group <- as.factor(alldata$age_group)

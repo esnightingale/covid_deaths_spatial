@@ -8,6 +8,7 @@
 
 library(tidyverse)
 library(lubridate)
+library(sf)
 
 # Local data directory
 datadir <- "C:/Users/phpuenig/Documents/COVID-19/Data/"
@@ -22,12 +23,12 @@ regions.df <- sf::st_drop_geometry(regions)
 
 list.files(here::here("code","utils"), full.names = TRUE) %>% purrr::walk(source)
 
+# Define time period by week start
+waves <- list(first = c(ymd("2020-01-01"), ymd("2020-06-30")),
+              second = c(ymd("2020-07-01"), ymd("2020-12-02")))
 
 ## DEATHS ##
 source(here::here("code","main","00_setup_deaths.R"))
-
-waves <- list(first = c(ymd("2020-01-01"), ymd("2020-06-30")),
-              second = c(ymd("2020-07-01"), max(alldata$date, na.rm = T)))
 
 deaths <- lapply(waves,
                  function(wave) setup_analysis_data(alldata, 
