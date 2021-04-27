@@ -16,8 +16,7 @@ library(tidyverse)
 library(dtplyr)
 
 dat <- readRDS(here::here("data","deaths.rds"))
-dat <- dat[[wave]] 
-# dat$n[dat$wk_since_first < 0] <- NA
+dat <- dat[["first"]] 
 
 pred_avgcov <- readRDS(here::here("output","fit_samples_avgcov.rds"))
 fit_pred <- pred_avgcov$fit
@@ -27,6 +26,16 @@ dat_pred <- pred_avgcov$dat
 # sims <- as.data.table(dplyr::bind_cols(lapply(samples_pred, get_preds, dat_pred)))
 # saveRDS(sims, file = here::here("output","sims_avgcov.rds"))
 
+# pred_nocov <- readRDS(here::here("output","fit_samples_nocov.rds"))
+# fit_nocov <- pred_nocov$fit
+# samples_nocov <- pred_nocov$samples
+
+# sims <- as.data.table(dplyr::bind_cols(lapply(samples_nocov, get_preds, dat)))
+# saveRDS(sims, file = here::here("output","sims_nocov.rds"))
+
+# Predictions without covariates
+# sims <- readRDS(file = here::here("output","sims_nocov.rds"))
+# Predictions at average covariates
 sims <- readRDS(file = here::here("output","sims_avgcov.rds"))
 data.table::setDT(sims)
 
@@ -47,7 +56,8 @@ sims$week <- dat$week
 sims$lad19nm <- dat$lad19nm
 sims$geography <- dat$geography
 sims$E_wk <- dat$E_wk_unstrat
-sims_long <- reshape2::melt(sims, id.vars = nsims+1:4)
+sims$n <- dat$n
+sims_long <- reshape2::melt(sims, id.vars = nsims+1:5)
 
 sims_long <- sims_long[, pred := exp(value)]
 sims_long <- sims_long[, pred_n := exp(value)*E_wk]
@@ -101,29 +111,29 @@ ggplot(as.data.frame(agg_sims[lad19nm %in% la_samp]),
   geom_ribbon(aes(ymin = q25, ymax = q75), alpha = 0.2) +
   geom_line() +
   geom_point(aes(y = n)) +
-  facet_wrap(~lad19nm) +
+  facet_wrap(~lad19nm, scales = "free") +
   theme_minimal()
 dev.off()
 
-lag <- 7
-agg_sims_lag <- agg_sims
-agg_sims_lag$week <- agg_sims_lag$week - lag
-agg_sims_lag <- merge(agg_sims_lag, cases[,c("week","lad19nm","cases")], by = c("week","lad19nm"))
-pdf(here::here("figures","deaths","pred_avgcov_wcases.pdf"), height = 50, width = 50)
-ggplot(as.data.frame(agg_sims_lag),
-       aes(week, q50*5)) +
-  geom_ribbon(aes(ymin = q05*5, ymax = q95*5, fill = geography), alpha = 0.2) +
-  geom_ribbon(aes(ymin = q25*5, ymax = q75*5, fill = geography), alpha = 0.2) +
-  geom_line(aes(col = geography)) +
-  geom_line(aes(y = cases), lty = "dashed", col = "darkgrey", lwd = 0.5) +
-  geom_point(aes(y = n*5), cex = 0.5, col= "darkgrey",pch = 20) +
-  facet_wrap(~lad19nm, scales = "free") +
-  labs(title = "Covariate-adjusted predicted deaths lagged by one week and rescaled by the median CFR post-P2 expansion (5 cases per death)",
-       subtitle = "Confirmed cases indicated by the dashed line. Observed deaths indicated by points. Predictions are coloured by geography type.",
-       y = "Rescaled weekly deaths",
-       x = "") +
-  theme_minimal()
-dev.off()
+# lag <- 7
+# agg_sims_lag <- agg_sims
+# agg_sims_lag$week <- agg_sims_lag$week - lag
+# agg_sims_lag <- merge(agg_sims_lag, cases[,c("week","lad19nm","cases")], by = c("week","lad19nm"))
+# pdf(here::here("figures","deaths","pred_avgcov_wcases.pdf"), height = 50, width = 50)
+# ggplot(as.data.frame(agg_sims_lag),
+#        aes(week, q50*5)) +
+#   geom_ribbon(aes(ymin = q05*5, ymax = q95*5, fill = geography), alpha = 0.2) +
+#   geom_ribbon(aes(ymin = q25*5, ymax = q75*5, fill = geography), alpha = 0.2) +
+#   geom_line(aes(col = geography)) +
+#   geom_line(aes(y = cases), lty = "dashed", col = "darkgrey", lwd = 0.5) +
+#   geom_point(aes(y = n*5), cex = 0.5, col= "darkgrey",pch = 20) +
+#   facet_wrap(~lad19nm, scales = "free") +
+#   labs(title = "Covariate-adjusted predicted deaths lagged by one week and rescaled by the median CFR post-P2 expansion (5 cases per death)",
+#        subtitle = "Confirmed cases indicated by the dashed line. Observed deaths indicated by points. Predictions are coloured by geography type.",
+#        y = "Rescaled weekly deaths",
+#        x = "") +
+#   theme_minimal()
+# dev.off()
 
 
 ###############################################################################

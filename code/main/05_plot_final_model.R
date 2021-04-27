@@ -70,15 +70,6 @@ inla.zmarginal(inla.tmarginal(function(x) exp(x/100), fit_final$marginals.fixed[
 get_coeffs(fit_final)
 
 png(here::here("figures",measure,"covariates_final.png"), height = 800, width = 1000, res = 150)
-# tiff(filename = "./figures/final_altdata/map_resids.tif", height = 600, width = 1000)
-
-# fit_final$summary.fixed[-1,] %>% #rep_BYM
-#   rownames_to_column(var = "Covariate") %>%
-#   ggplot(aes(x = Covariate, y = mean,  ymin = `0.025quant`, ymax = `0.975quant`)) +
-#   geom_pointrange() +
-#   geom_hline(aes(yintercept = 0), lty = "dashed",col = "red") +
-#   labs(y = "Estimate") 
-#   
 fit_final %>% 
   get_coeffs() %>% 
   slice(-1) %>%
@@ -160,8 +151,7 @@ plot_la_fit <- function(id){
          subtitle = "Observed rates shown in black, with 50-95% posterior quantiles") %>%
     return()
 }
-  
-plot_la_fit(hi_IID)
+
 png(here::here("figures",measure,"ltla_hi_IID.png"), height = 1200, width = 1200, res = 200)
 plot_la_fit(hi_IID)
 dev.off()
@@ -203,14 +193,6 @@ dat_plot_geog <- dat_sims_long[,.(pred_n = sum(pred_n),
 dat_plot_geog <- dat_plot_geog[, group := paste(variable, geography)]
 
 
-agg_sims <- dat_sims_long[,.(q05 = quantile(pred_n, 0.05),
-                             q25 = quantile(pred_n, 0.25),
-                             q50 = quantile(pred_n, 0.5),
-                             q75 = quantile(pred_n, 0.75),
-                             q95 = quantile(pred_n, 0.95),
-                             obs = mean(n)),
-                          by = .(la, lad19cd, lad19nm, la_pop, geography, week)]
-
 ## Overall and by geography ##
 
 ggplot(as.data.frame(dat_plot_tot)) + 
@@ -231,12 +213,20 @@ dev.off()
 
 ## By LTLA ##
 
+agg_sims <- dat_sims_long[,.(q01 = quantile(pred_n, 0.01),
+                             q25 = quantile(pred_n, 0.25),
+                             q50 = quantile(pred_n, 0.5),
+                             q75 = quantile(pred_n, 0.75),
+                             q99 = quantile(pred_n, 0.99),
+                             obs = mean(n)),
+                          by = .(la, lad19cd, lad19nm, la_pop, geography, week)]
+
 calc_inc <- function(x) x*1e5/agg_sims$la_pop
 agg_sims_plot <- mutate(agg_sims, across(q05:obs, calc_inc))
 
 plot_fit_la <- function(plotdata){
   ggplot(plotdata, aes(x = week)) + 
-    geom_ribbon(aes(ymin = q05, ymax = q95), alpha = 0.2, fill = "steelblue") +
+    geom_ribbon(aes(ymin = q01, ymax = q98), alpha = 0.2, fill = "steelblue") +
     geom_ribbon(aes(ymin = q25, ymax = q75), alpha = 0.2, fill = "steelblue") +
     geom_line(aes(y = q50), col = "steelblue") +
     geom_point(aes(y = obs), cex = 0.5) + 
@@ -244,7 +234,7 @@ plot_fit_la <- function(plotdata){
     labs(x = "Calendar week", 
          y = "Rate per 100,000", 
          title = "Model fit over time, by calendar week", 
-         subtitle = paste0("Observed rates shown in black, with 50-90% quantiles over ", nsims, " posterior samples")) %>%
+         subtitle = paste0("Observed rates shown in black, with 50-98% quantiles over ", nsims, " posterior samples")) %>%
     return()
 }
 
@@ -259,16 +249,6 @@ dev.off()
 
 
 # LTLAs with low and high average relative risks
-sims_byla <- dat_sims_long[,.(pred_n = sum(value),
-                              n = sum(n, na.rm = T)),
-                          by = .(la, lad19cd, lad19nm, la_pop, geography, variable)]
-agg_byla <- sims_byla[,.(q05 = quantile(pred_n, 0.05),
-                         q25 = quantile(pred_n, 0.25),
-                         q50 = quantile(pred_n, 0.5),
-                         q75 = quantile(pred_n, 0.75),
-                         q95 = quantile(pred_n, 0.95),
-                         obs = mean(n)),
-             by = .(la, lad19cd, lad19nm, la_pop, geography)]
 
 dat$RR <- fit_final$summary.fitted.values[, "0.5quant"]
 dat$LL <- fit_final$summary.fitted.values[, "0.025quant"]

@@ -1,4 +1,4 @@
-plot_reconst <- function(agg_sims, lag, sample = NA, save = T, suffix = "", h = 50, w = 50, order = T, format = "pdf"){
+plot_reconst <- function(agg_sims, lag, sample = NA, save = T, suffix = "", h = 1200, w = 1800, order = T, format = "png"){
   
   plot.data <- agg_sims$preds
   
@@ -20,8 +20,8 @@ plot_reconst <- function(agg_sims, lag, sample = NA, save = T, suffix = "", h = 
     plot.data$facet <- plot.data$geography
   }
   
-  else if (agg_sims$type == "_total"){
-    suffix <- paste0(suffix, "total")
+  else if (agg_sims$type == "total"){
+    suffix <- paste0(suffix, "_total")
   }
   
   
@@ -40,7 +40,7 @@ plot_reconst <- function(agg_sims, lag, sample = NA, save = T, suffix = "", h = 
                           # samples_cfr, 
                           # "samples from",
                           min(scale_quants)*100,"% to ", max(scale_quants)*100,"% quantiles of",
-                          " the observed CFR distribution post-P2 expansion.")) +
+                          " LTLA-specific CFR post-P2 expansion.")) +
     theme_minimal()
   
   if (agg_sims$type != "total"){
@@ -50,11 +50,11 @@ plot_reconst <- function(agg_sims, lag, sample = NA, save = T, suffix = "", h = 
 
   if (save == T){
     if (format == "pdf"){  
-      pdf(here::here("figures","compare","expanded",paste0("reconstr_lag",lag,suffix,".pdf")), height = h, width = w)
+      pdf(here::here(figdir,paste0("reconstr_lag",lag,suffix,".pdf")), height = h, width = w)
       print(p)
       dev.off()
     } else if(format == "png") {
-      png(here::here("figures","compare","expanded",paste0("reconstr_lag",lag,suffix,".png")), height = h, width = w, res = 200)
+      png(here::here(figdir,paste0("reconstr_lag",lag,suffix,".png")), height = h, width = w, res = 200)
       print(p)
       dev.off()
     }
