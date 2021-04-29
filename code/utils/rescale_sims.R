@@ -2,7 +2,7 @@ rescale_sims <- function(cfr_out, scale_quants = c(0.25, 0.75)){ #
 
   cfr_out$ratio %>%
     filter(period == 2) %>%
-    group_by(lad19nm, variable) %>%
+    group_by(lad19nm, sim) %>%
     summarise(q50 = quantile(CFR, probs = 0.5),
               qlow = quantile(CFR, probs = scale_quants[1]),
               qhi = quantile(CFR, probs = scale_quants[2])) %>%
@@ -21,7 +21,3 @@ rescale_sims <- function(cfr_out, scale_quants = c(0.25, 0.75)){ #
   return(rescaled)
   
 }
-
-# q50w = Hmisc::wtd.quantile(CFR, probs = 0.5, weights = n_d, normwt = T),
-# qloww = Hmisc::wtd.quantile(CFR, probs = scale_quants[1], weights = n_d, normwt = T),
-# qhiw = Hmisc::wtd.quantile(CFR, probs = scale_quants[2], weights = n_d, normwt = T)
