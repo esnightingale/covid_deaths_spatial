@@ -1,18 +1,19 @@
-get_cfr <- function(deaths, cases, lag, scale_quants){
+get_cfr <- function(sims, cases, lag, plot = F){
   
-  deaths %>%
-    mutate(n = replace_na(n, 0),
-           week = week-lag) %>%
-    full_join(dplyr::select(cases,lad19nm,geography,week,n), by = c("lad19nm","week","geography"), suffix = c("_d","_c")) %>%
-    mutate(CFR = n_c/n_d,
-           wt = round(n_d*100000/sum(n_d, na.rm = T)),
+  sims_long %>%
+    as.data.frame() %>%
+    mutate(week = week-lag) %>%
+    rename(sim = variable) %>% 
+    full_join(dplyr::select(cases,lad19nm,geography,week,n), by = c("lad19nm","week","geography"), suffix = c("_d","_c")) %>% 
+    # Calculate CFR where predicted deaths are at least 1
+    mutate(CFR = (n_c/pred_n)*(pred_n >=1),
            period = case_when(week < ymd("2020-05-18") ~ 1,
-                              week >= ymd("2020-05-18") ~ 2)) %>%  
-    filter(is.finite(CFR) & CFR > 0) %>%
-    group_by(lad19nm, geography, week, period, CFR) %>% 
-    tidyr::expand(wt = seq(1:wt)) %>%
+                              week >= ymd("2020-05-18") ~ 2)) %>%
+    mutate(CFR= na_if(CFR, 0)) %>%
     ungroup() -> ratio
-
+  
+  View(filter(ratio, sim== 1))
+  
   ratio %>% 
     summarise(med = median(CFR, na.rm = TRUE),
               q1 = quantile(CFR, p = 0.25, na.rm = TRUE),
@@ -26,7 +27,6 @@ get_cfr <- function(deaths, cases, lag, scale_quants){
               q3 = quantile(CFR, p = 0.75, na.rm = TRUE)) %>%
     print()
   
-  
   ratio %>% 
     group_by(geography,period) %>%
     summarise(med = median(CFR, na.rm = TRUE),
@@ -34,18 +34,69 @@ get_cfr <- function(deaths, cases, lag, scale_quants){
               q3 = quantile(CFR, p = 0.75, na.rm = TRUE)) %>%
     print()
   
-  # Plot distribution of observed CFR
-  CFR_wtd <- ratio$CFR[ratio$period == 2]
-  lims <- c(0,quantile(CFR_wtd, 0.999, na.rm = T))
-  x <- 0:max(CFR_wtd)
-  png(here::here("figures","compare",paste0("cfr_dist_lag",lag,".png")), height = 600, width = 800, res = 150)
-  hist(CFR_wtd, breaks = 200, prob = T, xlim = lims, main = "")
-  lines(x, EnvStats::demp(x, CFR_wtd), col = "red")
-  dev.off()
+  if (plot == T){
+    
+    ## Ratio per LTLA
+    ratio %>%
+      group_by(lad19nm, period, sim) %>%
+      summarise(n_d = sum(n_d, na.rm = T),
+                n_c = sum(n_c, na.rm = T),
+                CFR = median(CFR, na.rm = T)) %>%
+      group_by(lad19nm, period) %>%
+      summarise(n_d = median(n_d, na.rm = T),
+                n_c = median(n_c, na.rm = T),
+                CFR = median(CFR, na.rm = T)) %>%
+      ungroup() -> ratio_la
   
-  quants <- quantile(ratio$CFR[ratio$period == 2], probs = scale_quants, na.rm = TRUE)
-  quants
+    print(summary(ratio_la$CFR[ratio_la$period == 1]))
+    print(summary(ratio_la$CFR[ratio_la$period == 2]))
   
-  return(list(quants = quants, ratio = ratio, lag = lag))
+    regions %>%
+      full_join(ratio_la) %>%
+      mutate(period = factor(period,labels = c("2020-01-01 - 2020-05-17","2020-05-18 - 2020-06-30"))) %>%
+      basic_map(fill = "CFR", scale = F) +
+      scale_fill_viridis_c(trans = "log2") +
+      facet_wrap(~period, ncol = 2) +
+      labs(title = "",
+           fill = "Ratio",
+           caption = paste("Ratios where no. deaths or no. cases = 0 are not calculated")) -> maps
+  
+    ## Ratio per week
+    ratio %>%
+      group_by(week, period, sim) %>%
+      summarise(n_d = sum(n_d, na.rm = T),
+                n_c = sum(n_c, na.rm = T),
+                CFR = median(CFR, na.rm = T)) %>%
+      group_by(week, period) %>%
+      summarise(med = median(CFR, na.rm = T),
+                l1 = quantile(CFR, 0.01, na.rm = T),
+                l2 = quantile(CFR, 0.25, na.rm = T),
+                h2 = quantile(CFR, 0.75, na.rm = T),
+                h1 = quantile(CFR, 0.99, na.rm = T)) %>%
+      ungroup() -> ratio_wk
+    
+    ratio_wk %>%
+      ggplot(aes(x = week)) +
+        geom_ribbon(aes(ymin = l1, ymax = h1), alpha = 0.2, fill = "steelblue") +
+        geom_ribbon(aes(ymin = l2, ymax = h2), alpha = 0.2, fill = "steelblue") +
+        geom_line(aes(y = med), col = "steelblue") +
+        scale_y_continuous(trans = "log2") +
+        geom_vline(xintercept = ymd("2020-05-18"), col = "indianred") +
+        annotate("text", x = ymd("2020-05-19"), y = 0.25, label = "P2 available to all symptomatic cases", cex = 2, hjust = "left") +
+        geom_vline(xintercept = ymd("2020-04-15"), col = "indianred") +
+        annotate("text", x = ymd("2020-04-16"), y = 0.15, label = "P2 available to care home residents and staff", cex = 2, hjust = "left") +
+        labs(x = "", y = "Observed CFR") +
+        scale_x_date(limits = c(ymd("2020-02-05"),ymd("2020-06-17"))) -> time
+    
+    png(here::here(figdir,paste0("map_obs_cfr_",lag,".png")), height = 1000, width = 1500, res = 200)
+    print(maps)
+    dev.off()
+  
+    png(here::here(figdir,paste0("time_obs_cfr_",lag,".png")), height = 1000, width = 1500, res = 200)
+    print(time)
+    dev.off()
+  }
+
+  return(list(ratio = ratio, lag = lag))
   
 }

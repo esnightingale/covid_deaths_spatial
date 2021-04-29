@@ -1,19 +1,23 @@
+rescale_sims <- function(cfr_out, scale_quants = c(0.25, 0.75)){ #
 
-rescale_sims <- function(sims, ratio){
+  cfr_out$ratio %>%
+    filter(period == 2) %>%
+    group_by(lad19nm, sim) %>%
+    summarise(q50 = quantile(CFR, probs = 0.5),
+              qlow = quantile(CFR, probs = scale_quants[1]),
+              qhi = quantile(CFR, probs = scale_quants[2])) %>%
+    pivot_longer(starts_with("q"), names_to = "scale_quant", values_to = "cfr") -> CFR_la
   
-  # For each posterior sample, rescale by specified quantiles of the CFR distribution
-  scaled_sims <- dplyr::bind_rows(lapply(ratio$quants, lag_rescale, lag = ratio$lag, sims = sims_long))
+  # CFR_la consists of one CFR estimate per posterior sample for each LTLA
   
-  scaled_sims$scale_quant <- group_indices(scaled_sims, scale)
-  
-  scaled_sims %>%
-    # scaled_sims <- lag_rescale(lag = lag, ratiodist = CFR_obs, sims = sims) %>%
-    dplyr::group_by(lad19nm, week) %>%
+  cfr_out$ratio %>%
+    full_join(CFR_la) %>% #slice(1:48940) %>% View()
+    mutate(pred_c = pred_n*cfr) %>%
+    group_by(lad19nm, week, scale_quant) %>%
     dplyr::mutate(sim = row_number(),
-                  lag = paste(ratio$lag/7,"weeks")) %>% 
-    dplyr::ungroup() %>%
-    dplyr::left_join(dplyr::select(cases, lad19nm, geography, week, n), by = c("lad19nm","geography","week")) -> scaled_sims_cases 
- 
-  return(scaled_sims_cases)
+                  lag = paste(cfr_out$lag/7,"weeks")) %>% 
+    dplyr::ungroup() -> rescaled
+
+  return(rescaled)
   
 }
