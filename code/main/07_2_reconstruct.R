@@ -50,7 +50,7 @@ cases <- readRDS(here::here("data","cases.rds"))[[1]]
 # + Aggregate over sims to country/geography/LTLA
 # + Plot quantiles alongside observed cases
 
-reconstruct7 <- reconstruct(sims_long, cases, lag = 7, plot = T, suffix = "nocov")
+reconstruct7 <- reconstruct(sims_long, cases, lag = 7, plot = T, suffix = "")
 # 1  4.11  2.62  6.75
 # 2  5.37  3.07  9.09
 reconstruct14 <- reconstruct(sims_long, cases, lag = 14, plot = T, suffix = "")
@@ -67,6 +67,7 @@ saveRDS(reconstruct21, here::here("output","reconstruct_lag21.rds"))
 ## Summarise observed/predicted per LTLA and map ##
 
 reconstruct7$sims %>%
+  # rescaled %>%
   dplyr::group_by(lad19nm, sim, scale_quant) %>%
   dplyr::summarise(pred = sum(pred_c),
                    obs = sum(n_c, na.rm = T)) %>%
@@ -80,7 +81,7 @@ summary(obs_pred_diffs$obs_med)
 # Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
 # 0.2653  0.6046  0.9239  1.0890  1.3537  3.9174 
 # 
-png(here::here("figures","compare","underascertainment_lag_7.png"), height = 1500, width = 2000, res = 250)
+png(here::here("figures","compare","underascertainment_space_lag7.png"), height = 1500, width = 2000, res = 250)
 regions %>% 
   dplyr::full_join(obs_pred_diffs) %>%
   basic_map(fill = "obs_med", plot.border = T) +
@@ -96,8 +97,7 @@ reconstruct7$sims %>%
   dplyr::summarise(obs = sum(n_c, na.rm = T)) %>%
   dplyr::group_by(week) %>%
   dplyr::summarise(obs = median(obs)) %>% pull(obs) -> obs
-  # ggplot(aes(week, obs)) + geom_line() 
-
+  
 reconstruct7$sims %>%
   dplyr::group_by(week, sim, scale_quant) %>%
   dplyr::summarise(pred = sum(pred_c)) %>%
@@ -109,7 +109,7 @@ reconstruct7$sims %>%
                    h2 = quantile(pred, plot_quants[4])) %>% 
   dplyr::ungroup() %>%
   dplyr::mutate(obs = obs) %>%
-  dplyr::mutate(across(l1:h2, function(pred) return(obs/pred), .names = "{.col}_pred")) -> obs_pred_time
+  dplyr::mutate(across(l1:h2, function(pred) return(obs/pred))) -> obs_pred_time 
 
 summary(obs_pred_time)
 
@@ -121,6 +121,7 @@ obs_pred_time %>%
   geom_ribbon(aes(ymin = l1, ymax = h1), alpha = 0.2, fill = "steelblue") +
   geom_ribbon(aes(ymin = l2, ymax = h2), alpha = 0.2, fill = "steelblue") +
   geom_line(aes(y = med), col = "steelblue") +
+  # scale_x_date(limits = c(ymd("2020-02-26",ymd("2020-06-17")))) +
   scale_y_continuous(trans = "log2", labels = scales::number_format(accuracy = 0.01)) +
   geom_vline(xintercept = ymd("2020-05-18"), col = "red") +
   annotate("text", x = ymd("2020-05-19"), y = 0.25, label = "P2 available to all symptomatic cases", cex = 2, hjust = "left") +
@@ -132,31 +133,6 @@ dev.off()
 
 # ---------------------------------------------------------------------------- #
 ## Compare one/two week lags for total time series ##
-
-# lagcomp <- dplyr::bind_rows(reconstruct7$total$preds, reconstruct14$total$preds)
-# 
-# png(here::here("figures","compare","reconstr_totals.png"), height = 1200, width = 2800, res = 250)
-# lagcomp %>%
-#   ggplot(aes(week)) + 
-#   geom_ribbon(aes(ymin = l1, ymax = h1), alpha = 0.2, fill = "steelblue") +
-#   geom_ribbon(aes(ymin = l2, ymax = h2), alpha = 0.2, fill = "steelblue") +
-#   geom_line(aes(y = med), col = "steelblue") +
-#   scale_x_date() +
-#   geom_point(aes(y = obs)) +
-#   facet_wrap(~lag) +
-#   labs(x = "",y = "", title = "Reconstruction of confirmed cases from COVID-19-related deaths across England",
-#        subtitle = "Comparison of assumed lags between case confirmation and death",
-#        caption = paste0("Median, ",
-#                         (plot_quants[3]-plot_quants[2])*100, " and ",
-#                         (plot_quants[4]-plot_quants[1])*100,
-#                         "% quantile intervals over ", nsims, " posterior simulations, scaled by ",
-#                         # samples_cfr, 
-#                         # "samples",
-#                         min(scale_quants)*100,"% to ", max(scale_quants)*100, "% quantiles",
-#                         " from the observed CFR distribution post-P2 expansion.")) +
-#   theme_minimal() 
-# dev.off()
-
 
 lagcomp <- dplyr::bind_rows(reconstruct7$total$preds, reconstruct14$total$preds, reconstruct21$total$preds) %>%
   rename(Lag = lag)
@@ -183,7 +159,8 @@ dev.off()
 # ---------------------------------------------------------------------------- #
 
 ## Total cases overall
-reconstruc7$sims %>%
+reconstruct7$sims %>%
+  # rescaled %>%
   dplyr::group_by(sim, scale_quant) %>%
   dplyr::summarise(pred_c = sum(pred_c, na.rm = TRUE),
                    cases = sum(n_c, na.rm = TRUE)) %>% #filter(sim == 1) %>% View

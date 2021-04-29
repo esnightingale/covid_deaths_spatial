@@ -1,12 +1,26 @@
 get_cfr <- function(sims, cases, lag, plot = F){
   
-  sims_long %>%
+  # Gives saved version of reconstructions
+  sims %>%
     as.data.frame() %>%
     mutate(week = week-lag) %>%
     rename(sim = variable) %>% 
     full_join(dplyr::select(cases,lad19nm,geography,week,n), by = c("lad19nm","week","geography"), suffix = c("_d","_c")) %>% 
-    # Calculate CFR where predicted deaths are at least 1
-    mutate(CFR = (n_c/pred_n)*(pred_n >=1),
+    mutate(CFR = (n_c/pred_n), #*(pred_n >=1)
+           period = case_when(week < ymd("2020-05-18") ~ 1,
+                              week >= ymd("2020-05-18") ~ 2)) %>%
+    # mutate(CFR= na_if(CFR, 0)) %>%
+    # Only include values where 
+    filter(is.finite(CFR) & CFR > 0) %>%
+    ungroup() -> ratio
+  
+  # New version keeping all rows but CFR NA if cases or deaths == 0
+  sims %>%
+    as.data.frame() %>%
+    mutate(week = week-lag) %>%
+    rename(sim = variable) %>% 
+    full_join(dplyr::select(cases,lad19nm,geography,week,n), by = c("lad19nm","week","geography"), suffix = c("_d","_c")) %>% 
+    mutate(CFR = (n_c/pred_n)*(pred_n > 0), 
            period = case_when(week < ymd("2020-05-18") ~ 1,
                               week >= ymd("2020-05-18") ~ 2)) %>%
     mutate(CFR= na_if(CFR, 0)) %>%

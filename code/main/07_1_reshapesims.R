@@ -26,15 +26,6 @@ dat_pred <- pred_avgcov$dat
 # sims <- as.data.table(dplyr::bind_cols(lapply(samples_pred, get_preds, dat_pred)))
 # saveRDS(sims, file = here::here("output","sims_avgcov.rds"))
 
-# pred_nocov <- readRDS(here::here("output","fit_samples_nocov.rds"))
-# fit_nocov <- pred_nocov$fit
-# samples_nocov <- pred_nocov$samples
-
-# sims <- as.data.table(dplyr::bind_cols(lapply(samples_nocov, get_preds, dat)))
-# saveRDS(sims, file = here::here("output","sims_nocov.rds"))
-
-# Predictions without covariates
-# sims <- readRDS(file = here::here("output","sims_nocov.rds"))
 # Predictions at average covariates
 sims <- readRDS(file = here::here("output","sims_avgcov.rds"))
 data.table::setDT(sims)
@@ -134,6 +125,16 @@ dev.off()
 #        x = "") +
 #   theme_minimal()
 # dev.off()
+# 
+# pred_nocov <- readRDS(here::here("output","fit_samples_nocov.rds"))
+# fit_nocov <- pred_nocov$fit
+# samples_nocov <- pred_nocov$samples
+
+# sims <- as.data.table(dplyr::bind_cols(lapply(samples_nocov, get_preds, dat)))
+# saveRDS(sims, file = here::here("output","sims_nocov.rds"))
+
+# Predictions without covariates
+# sims <- readRDS(file = here::here("output","sims_nocov.rds"))
 
 
 ###############################################################################
