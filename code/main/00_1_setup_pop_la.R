@@ -1,11 +1,7 @@
-
 ################################################################################
 # Set up population data and add to shapefile
 ################################################################################
-
-library(tidyverse)
-library(sf)
-library(here)
+################################################################################
 
 # Function for LTLA pops: join City of London into Westminster, remove note rows and sum population > 65yrs
 join_city <- function(d){
@@ -26,25 +22,31 @@ join_city <- function(d){
   return(d)
 }
 
-pops_raw <- readxl::read_xls(paste0(datadir,"populations/ukmidyearestimates20192020ladcodes.xls"), 
-                     sheet = "MYE2 - Persons",
-                     skip = 4) 
+# ---------------------------------------------------------------------------- #
+# Load shapefiles
 
-## Load shapefiles
-regions_raw <- rgdal::readOGR(dsn = paste0(datadir,"maps/Local_Authority_Districts_(April_2019)_Boundaries_UK_BFC-shp"),
+regions_raw <- rgdal::readOGR(dsn = here::here("data","raw","Local_Authority_Districts_(April_2019)_Boundaries_UK_BFC-shp"),
                               layer = "Local_Authority_Districts_(April_2019)_Boundaries_UK_BFC-shp")
 
-male <- readxl::read_xls(paste0(datadir,"populations/ukmidyearestimates20192020ladcodes.xls"), 
+# ---------------------------------------------------------------------------- #
+# Raw population data
+
+pops_raw <- readxl::read_xls(here::here("data","raw","ukmidyearestimates20192020ladcodes.xls"), 
+                             sheet = "MYE2 - Persons",
+                             skip = 4) 
+
+male <- readxl::read_xls(here::here("data","raw","ukmidyearestimates20192020ladcodes.xls"), 
                          sheet = "MYE2 - Males",
                          skip = 4)  %>% 
   join_city()
 
-female <- readxl::read_xls(paste0(datadir,"populations/ukmidyearestimates20192020ladcodes.xls"), 
+female <- readxl::read_xls(here::here("data","raw","ukmidyearestimates20192020ladcodes.xls"), 
                            sheet = "MYE2 - Females",
                            skip = 4) %>% 
   join_city()
 
-################################################################################
+# ---------------------------------------------------------------------------- #
+# Tidy data
 
 rmv_rows <- min(which(rowSums(!is.na(pops_raw)) == 0)):nrow(pops_raw) # Note rows with exactly 0 non-missing entries
 pops <- pops_raw[-rmv_rows,]  
@@ -97,8 +99,8 @@ pops.wide <- pops.long %>%
   dplyr::select(-age_group10) %>% #-age_quintile
   dplyr::pivot_wider(id_cols = c(-age_group,-la_age_pop), names_from = age_group, values_from = la_age_pop)
 
-################################################################################
-# Add populations to shapefile
+# ---------------------------------------------------------------------------- #
+# Add tidied population data to shapefile
 
 regions <- st_as_sf(regions_raw) %>%
   dplyr::rename_all(tolower) %>%
@@ -127,8 +129,8 @@ regions <- dplyr::left_join(regions, pops.wide) %>%
   sf::st_transform("+init=epsg:27700 +units=km +no_defs")
 
 
-################################################################################
-# Sex ratio - population gt 65 
+# ---------------------------------------------------------------------------- #
+# Calculate sex ratio  
 
 prop_male <- male %>%
   dplyr::rename(lad19cd = Code,
@@ -144,9 +146,8 @@ regions <-
 regions$area_km2 <- sf::st_area(regions)
 
 
-################################
-#         Save outputs         #
-################################
+# ---------------------------------------------------------------------------- #
+# Save outputs
 
 saveRDS(pops.long, here::here("data","pops.long.rds"))
 
@@ -154,3 +155,5 @@ saveRDS(prop_male,  here::here("data","prop_male.rds"))
 
 saveRDS(regions,  here::here("data","LA_shp_wpops.rds"))
 
+################################################################################
+################################################################################
