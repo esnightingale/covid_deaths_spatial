@@ -10,17 +10,17 @@
 
 setup_analysis_data <- function(alldata, 
                                 measure,
-                                start = ymd("2020-01-01"), 
-                                end = ymd("2020-06-30")){
+                                start = lubridate::ymd("2020-01-01"), 
+                                end = lubridate::ymd("2020-06-30")){
 
 # start = ymd("2020-01-01")
 # end = ymd("2020-06-30")
 
-week_seq <- ymd(seq(start, end, by = "week"))
+week_seq <- lubridate::ymd(seq(start, end, by = "week"))
 week_seq
   
 alldata_sub <- alldata %>%
-    filter(between(date, start, end))
+  dplyr::filter(between(date, start, end))
   
 # --------------------------------------------------------------------------------------------#
 
@@ -36,31 +36,31 @@ ltla_first <- alldata_sub %>%
   dplyr::select(lad19cd, ltla_first) %>%
   unique()
 
-expand <- data.frame(week = rep(week_seq, n_distinct(alldata_sub$lad19cd)),
-                      lad19cd = rep(unique(alldata_sub$lad19cd), each = length(week_seq))) %>%
-  full_join(ltla_first) %>%
-  mutate(w = as.integer(lubridate::week(week))) %>%
-  left_join(la_pops)
+expand <- data.frame(week = rep(week_seq, dplyr::n_distinct(alldata_sub$lad19cd)),
+                     lad19cd = rep(unique(alldata_sub$lad19cd), each = length(week_seq))) %>%
+  dplyr::full_join(ltla_first) %>%
+  dplyr::mutate(w = as.integer(lubridate::week(week))) %>%
+  dplyr::left_join(la_pops)
 
 ## Aggregate linelist by week and LA
 alldata_sub %>%
-  group_by(lad19cd, week) %>%
-  count() %>%
-  ungroup() %>%
-  full_join(expand) %>%
-  full_join(ltla_first) %>%
-  left_join(la_pops) %>%
-  mutate(n = replace_na(n, 0),
+  dplyr::group_by(lad19cd, week) %>%
+  dplyr::count() %>%
+  dplyr::ungroup() %>%
+  dplyr::full_join(expand) %>%
+  dplyr::full_join(ltla_first) %>%
+  dplyr::left_join(la_pops) %>%
+  dplyr::mutate(n = tidyr::replace_na(n, 0),
          w = as.integer(lubridate::week(week))) %>%
-  arrange(lad19cd, week) -> d_agg_wk
+  dplyr::arrange(lad19cd, week) -> d_agg_wk
 
 # Aggregate by LA overall
 alldata_sub %>%
-  group_by(lad19cd, ltla_first) %>%
-  count(name = "n_total") %>%
-  full_join(la_pops) %>%
-  mutate(n_total = replace_na(n_total, 0)) %>%
-  ungroup() -> d_agg_tot
+  dplyr::group_by(lad19cd, ltla_first) %>%
+  dplyr::count(name = "n_total") %>%
+  dplyr::full_join(la_pops) %>%
+  dplyr::mutate(n_total = tidyr::replace_na(n_total, 0)) %>%
+  dplyr::ungroup() -> d_agg_tot
 
 
 # --------------------------------------------------------------------------------------------#
@@ -68,16 +68,16 @@ alldata_sub %>%
 # Final analysis dataset - merged with total incidence, covariates, populations and shapefile areas
 
 dat <- d_agg_wk %>%
-  full_join(d_agg_tot) %>% 
-  full_join(dplyr::select(regions, lad19cd, lad19nm, area_km2)) %>% 
-  left_join(covs) %>% 
-  rename(E = la_tot_E,
+  dplyr::full_join(d_agg_tot) %>% 
+  dplyr::full_join(dplyr::select(regions, lad19cd, lad19nm, area_km2)) %>% 
+  dplyr::left_join(covs) %>% 
+  dplyr::rename(E = la_tot_E,
          E_wk = la_wk_E,
          E_wk_unstrat = la_unstrat_wk_E) %>%
-  mutate(first = lubridate::floor_date(ltla_first, unit = "week", week_start = 3),
+  dplyr::mutate(first = lubridate::floor_date(ltla_first, unit = "week", week_start = 3),
          first_overall = min(first),
          date_first_overall = min(ltla_first, na.rm = T)) %>%
-  mutate(n = replace_na(n, 0),
+  dplyr::mutate(n = tidyr::replace_na(n, 0),
          geog = as.numeric(as.factor(geography)),
          wk_since_first = as.numeric(lubridate::interval(first,week), "weeks"),
          wk_first_la_overall = as.numeric(lubridate::interval(first_overall,first), "weeks"),
@@ -85,12 +85,12 @@ dat <- d_agg_wk %>%
          IMD_quint = cut(IMD, 5)) %>%  
   dplyr::select(n, E, E_wk, E_wk_unstrat, w, week, lad19cd, lad19nm, la_pop, geog, geography, area_km2, pop_dens,
                 first, wk_since_first, first_overall, wk_first_la_overall, med_age, IMD, IMD_quint, prop_minority, prop_kw) %>%
-  mutate(w2 = w, w3 = w, SIR = n/E) 
+  dplyr::mutate(w2 = w, w3 = w, SIR = n/E) 
 
 # add numeric indices for each LTLA
 dat$la <- dat %>%
-  group_by(lad19cd) %>%
-  group_indices()
+  dplyr::group_by(lad19cd) %>%
+  dplyr::group_indices()
 
 saveRDS(dat, paste0(datadir,sprintf("/dat_%s_%s_%s.rds",measure,start,end)))
 
