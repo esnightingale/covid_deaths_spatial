@@ -54,20 +54,5 @@ cases <- rlist::list.append(cases, breaks = waves)
 
 saveRDS(cases, here::here("data","cases.rds"))
 
-
-## Merge deaths and cases
-
-first <- dplyr::full_join(deaths[[1]], cases[[1]], 
-                   by = c("w","week","la","lad19cd","lad19nm", "la_pop","geog","geography",
-                          "area_km2","pop_dens","IMD","IMD_quint","prop_minority","prop_kw","w2","w3"),
-                   suffix = c("_d","_c"))
-
-second <- dplyr::full_join(deaths[[2]], cases[[2]], 
-                   by = c("w","week","la","lad19cd","lad19nm", "la_pop","geog","geography",
-                          "area_km2","pop_dens","IMD","IMD_quint","prop_minority","prop_kw","w2","w3"),
-                   suffix = c("_d","_c"))
-
-merged <- list(first = first, second = second, breaks = waves)
-
-saveRDS(merged, here::here("data","merged.rds"))
-
+################################################################################
+################################################################################

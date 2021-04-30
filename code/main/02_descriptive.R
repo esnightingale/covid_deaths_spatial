@@ -15,8 +15,6 @@
 figdir <- "figures/descriptive"
 
 # LTLA-week-aggregated observed deaths, expected deaths and LTLA covariates
-merged <- readRDS(here::here("data","merged.rds")) 
-
 deaths <- readRDS(here::here("data","deaths.rds")) 
 cases <- readRDS(here::here("data","cases.rds")) 
 
