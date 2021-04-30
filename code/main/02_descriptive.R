@@ -12,19 +12,7 @@
 # SETUP
 ################################################################################
 
-library(tidyverse)
-list.files(here::here("code","utils"), full.names = TRUE) %>% walk(source)
-
-# Figure output directory
-figdir <- "figures/final"
-
-## Shapefiles
-regions <- readRDS(paste0(datadir,"maps/LA_shp_wpops.rds")) %>%
-  st_set_crs("+OSGB:1936 +units=m +no_defs") %>%
-  filter(grepl("E", lad19cd))
-
-border <- st_union(regions)
-regions.df <- st_drop_geometry(regions)
+figdir <- "figures/descriptive"
 
 # LTLA-week-aggregated observed deaths, expected deaths and LTLA covariates
 merged <- readRDS(here::here("data","merged.rds")) 

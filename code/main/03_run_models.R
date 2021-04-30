@@ -1,5 +1,5 @@
 ################################################################################
-# Description: Run models
+# Description: Setup and run models, draw posterior samples
 # 
 # Author: Emily S Nightingale
 # Date created: 30/09/2020
@@ -11,23 +11,13 @@
 # SETUP
 ################################################################################
 
-library(tidyverse)
-
 measure <- "deaths"
-expected <- "E"
 wave <- 1
+expected <- "E"
 nsims <- 1000
 
-list.files(here::here("code","utils"), full.names = TRUE) %>% walk(source)
-
-## Shapefiles
-regions <- readRDS(paste0(datadir,"maps/LA_shp_wpops.rds")) %>%
-  filter(grepl("E", lad19cd))
-
-regions.df <- st_drop_geometry(regions)
-
 # Neighbourhood graph
-g <- inla.read.graph(filename = paste0(datadir,"maps/regions_eng.adj"))
+g <- inla.read.graph(filename = here::here("data","regions_eng.adj"))
 
 # LTLA-week-aggregated observed deaths, expected deaths and LTLA covariates
 # (first and second waves)
@@ -82,7 +72,6 @@ hist(1/sqrt(prior.samp.sp), breaks = 100)
 ################################################################################
 # FITTING
 ################################################################################
-
 
 ## Base model: No spatial effects, two temporal RWs, independent of geography
 f_base <- n ~ 

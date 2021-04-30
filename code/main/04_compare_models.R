@@ -11,20 +11,6 @@
 # SETUP
 ################################################################################
 
-library(tidyverse)
-list.files(here::here("code","utils"), full.names = TRUE) %>% walk(source)
-
-measure <- "deaths"
-wave <- 1
-
-figdir <- "figures/final"
-outdir <- "output/final"
-
-## Shapefiles
-regions <- readRDS(paste0(datadir,"maps/LA_shp_wpops.rds")) %>%
-  filter(grepl("E", lad19cd))
-border <- st_union(regions)
-
 # LTLA-week-aggregated observed deaths, expected deaths and LTLA covariates
 # (first and second waves)
 dat_all <- readRDS(here::here("data","deaths.rds"))
@@ -38,19 +24,13 @@ dat_tot <- dat %>%
   summarise(n = sum(n, na.rm = T),
             E = unique(E))
 
-linelist <- readRDS(paste0(datadir, sprintf("linelist_%s.rds",measure))) 
-
 weekrange <- seq(min(dat$w), max(dat$w))
 weekseq <- seq(min(dat$week), max(dat$week), by = "week")
 
 # Fitted models and posterior samples
-fits <- readRDS(file = here::here("output",
-                                  sprintf("fits_%s_%s.rds",measure, wave)))
-fit_final <- fits[[6]]
-samples <- readRDS(file = here::here("output",
-                                     sprintf("samples_%s_%s.rds",measure, wave)))
-samples_final <- samples[[6]]
-nsims <- length(samples_final)
+fits <- readRDS(file = here::here("output",sprintf("fits_%s_%s.rds","deaths", wave)))
+samples <- readRDS(file = here::here("output",sprintf("samples_%s_%s.rds","deaths", wave)))
+nsims <- length(samples[[1]])
 
 # ---------------------------------------------------------------------------- #
 # CHECK CPO
@@ -96,14 +76,21 @@ resids <- lapply(fits, function(fit) get_resid(fit)$resid) %>%
 
 dat_resid <- bind_cols(dat, resids) 
 
-dat_resid %>%  pivot_longer(cols = base:BYM_geog) %>% group_by(name) %>% summarise(median = median(value, na.rm = T), mean = mean(value, na.rm = T)) -> avg_resid
+dat_resid %>%  
+  pivot_longer(cols = base:BYM_geog) %>% 
+  group_by(name) %>% 
+  summarise(median = median(value, na.rm = T),
+            mean = mean(value, na.rm = T)) -> avg_resid
+
 png(here::here(figdir,"map_resids_6mods.png"), height = 1000, width = 1600, res = 150)
 dat_resid %>%
   pivot_longer(cols = base:BYM_geog) %>% 
   group_by(lad19cd, name) %>%
   summarise(value = mean(value, na.rm = T)) %>%
   left_join(avg_resid) %>%
-  mutate(name = factor(name, levels = c("base","base_geog","iid","iid_geog", "BYM","BYM_geog"), labels = c("Temporal only (A)", "Geography-specific temporal (B)","A + IID spatial", "B + IID spatial","A + BYM spatial","B + BYM spatial"))) %>%
+  mutate(name = factor(name, 
+                       levels = c("base","base_geog","iid","iid_geog", "BYM","BYM_geog"), 
+                       labels = c("Temporal only (A)", "Geography-specific temporal (B)","A + IID spatial", "B + IID spatial","A + BYM spatial","B + BYM spatial"))) %>%
   group_by(name) %>%
   mutate(name2 = as.factor(paste0(name," (",round(mean,4),")"))) %>% # View()
   left_join(regions) %>%
@@ -112,7 +99,8 @@ dat_resid %>%
   # scale_fill_viridis_c(trans = "log2") +
   facet_wrap(~name2) +
   theme(legend.position = c(0,0.5)) +
-  labs(title = "Mean pearson residual per local authority", subtitle = "Mean over all LTLAs given in brackets")
+  labs(title = "Mean pearson residual per local authority", 
+       subtitle = "Mean over all LTLAs given in brackets")
 dev.off()
 
 
@@ -129,7 +117,9 @@ dat_logs %>%
   pivot_longer(cols = base:BYM_geog) %>% 
   group_by(lad19cd, name) %>%
   summarise(value = -mean(value, na.rm = T)) %>%
-  mutate(name = factor(name, levels = c("base","base_geog","iid","iid_geog", "BYM","BYM_geog"), labels = c("Temporal only (A)", "Geography-specific temporal (B)","A + IID spatial", "B + IID spatial","A + BYM spatial","B + BYM spatial"))) %>%
+  mutate(name = factor(name, 
+                       levels = c("base","base_geog","iid","iid_geog", "BYM","BYM_geog"), 
+                       labels = c("Temporal only (A)", "Geography-specific temporal (B)","A + IID spatial", "B + IID spatial","A + BYM spatial","B + BYM spatial"))) %>%
   group_by(name) %>%
   mutate(name2 = as.factor(paste0(name," (",round(mean(value),2),")"))) %>% #View()
   left_join(regions) %>%
@@ -166,7 +156,8 @@ for (s in seq_along(samples)){
   
   pdf(here::here("figures",measure,paste0("summ_post_", names(fits)[s],".pdf")), height = 8, width = 10)
   
-  dat_pred <- bind_cols(dplyr::select(dat, geography, lad19cd, lad19nm, la, la_pop, week, E_wk, n), preds) %>%
+  dat_pred <- bind_cols(dplyr::select(dat, geography, lad19cd, lad19nm, la, la_pop, week, E_wk, n), 
+                        preds) %>%
     pivot_longer(cols = -1:-8) %>%
     mutate(pred_n = exp(value)*E_wk)
   

@@ -13,12 +13,6 @@
 # SETUP
 ################################################################################
 
-library(tidyverse)
-list.files(here::here("code","utils"), full.names = TRUE) %>% walk(source)
-
-measure <- "deaths"
-wave <- 1
-
 # Neighbourhood graph
 g <- inla.read.graph(filename = paste0(datadir,"maps/regions_eng.adj"))
 
@@ -42,6 +36,7 @@ samples <- readRDS(file = here::here("output",
 samples_final <- samples[[6]]
 
 # ---------------------------------------------------------------------------- #
+
 ######################
 #       PRIORS       #
 ######################

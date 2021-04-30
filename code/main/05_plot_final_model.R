@@ -11,20 +11,6 @@
 # SETUP
 ################################################################################
 
-library(tidyverse)
-list.files(here::here("code","utils"), full.names = TRUE) %>% walk(source)
-
-measure <- "deaths"
-wave <- 1
-
-figdir <- "figures/deaths"
-outdir <- "output/final"
-
-## Shapefiles
-regions <- readRDS(paste0(datadir,"maps/LA_shp_wpops.rds")) %>%
-  filter(grepl("E", lad19cd))
-border <- st_union(regions)
-
 # LTLA-week-aggregated observed deaths, expected deaths and LTLA covariates
 # (first and second waves)
 dat_all <- readRDS(here::here("data","deaths.rds"))
@@ -43,9 +29,9 @@ weekseq <- seq(min(dat$week), max(dat$week), by = "week")
 
 # Fitted models and posterior samples
 fit_final <- readRDS(file = here::here("output",
-                                  sprintf("fits_%s_%s.rds",measure, wave)))[[6]]
+                                  sprintf("fits_%s_%s.rds","deaths", wave)))[[6]]
 samples_final <- readRDS(file = here::here("output",
-                                     sprintf("samples_%s_%s.rds",measure, wave)))[[6]]
+                                     sprintf("samples_%s_%s.rds","deaths", wave)))[[6]]
 
 nsims <- length(samples_final)
 
@@ -90,7 +76,8 @@ dev.off()
 dat_w <- data.frame(w = weekrange,
                     trend=fit_final$summary.random$w$`0.5quant`,
                     Model = "Calendar week") %>%
-  bind_rows(bind_cols(expand.grid(w = seq(min(dat$wk_since_first),max(dat$wk_since_first)), geography = sort(unique(dat$geography))),
+  bind_rows(bind_cols(expand.grid(w = seq(min(dat$wk_since_first),max(dat$wk_since_first)), 
+                                  geography = sort(unique(dat$geography))),
                       data.frame(trend = fit_final$summary.random$wk_since_first$`0.5quant`,
                                  Model = "Week since first death"))) %>%
   mutate(geography = factor(replace_na(as.character(geography), "All"),
@@ -200,12 +187,17 @@ dat_plot_geog <- dat_plot_geog[, group := paste(variable, geography)]
 ggplot(as.data.frame(dat_plot_tot)) + 
   geom_line(aes(week, pred_n*1e5/pop, group = variable), alpha = 0.1, col = "grey") +
   geom_point(aes(week, obs*1e5/pop)) + 
-  labs(x = "Calendar week", y = "Rate per 100,000", title = "Total fit over time, by calendar week", subtitle = paste0("Observed rates shown in black, with ", nsims, " posterior samples in grey")) -> plot_fit_time
+  labs(x = "Calendar week", y = "Rate per 100,000", 
+       title = "Total fit over time, by calendar week", 
+       subtitle = paste0("Observed rates shown in black, with ", nsims, " posterior samples in grey")) -> plot_fit_time
 
 ggplot(as.data.frame(dat_plot_geog)) + 
   geom_line(aes(week, pred_n*1e5/pop, group = group, col = geography), alpha = 0.1) +
   geom_point(aes(week, obs*1e5/pop, col = geography), pch = 21, fill = "white") + 
-  labs(x = "Calendar week", y = "Rate per 100,000", title = "Total fit over time, by calendar week and geography", subtitle = paste0("Observed rates shown in white, with ", nsims, " posterior samples"), col = "Geography") +
+  labs(x = "Calendar week", y = "Rate per 100,000", 
+       title = "Total fit over time, by calendar week and geography", 
+       subtitle = paste0("Observed rates shown in white, with ", nsims, " posterior samples"), 
+       col = "Geography") +
   theme(legend.position = c(0.2,0.7))  -> plot_fit_time_geog
 
 png(here::here(figdir,"fit_total_geog.png"), height = 1500, width = 1500, res = 200)
@@ -258,7 +250,9 @@ dat$UL <- fit_final$summary.fitted.values[, "0.975quant"]
 
 dat_la <- dat %>%
   group_by(lad19cd) %>%
-  summarise(Median = mean(RR, na.rm = TRUE), Lower = mean(LL, na.rm = TRUE), Upper = mean(UL, na.rm = TRUE)) %>%
+  summarise(Median = mean(RR, na.rm = TRUE), 
+            Lower = mean(LL, na.rm = TRUE), 
+            Upper = mean(UL, na.rm = TRUE)) %>%
   as.data.frame()
 
 png(here::here(figdir,"fitted_RR_CrI.png"), height = 1000, width = 1800, res = 200)
