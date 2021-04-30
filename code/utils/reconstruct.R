@@ -19,7 +19,7 @@ reconstruct <- function(sims_long, cases, lag,
     plot_reconst(agg_la, lag, h = 50, w = 50, format = "pdf", suffix = "wtd")
   }
   
-  return(list(total = agg_total, geog = agg_geog, la = agg_la, sims = rescaled))
+  return(list(total = agg_total, geog = agg_geog, la = agg_la, sims = rescaled, lag = lag))
   
 }
 

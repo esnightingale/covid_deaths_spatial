@@ -25,6 +25,7 @@ library(sf)
 library(ggspatial)
 library(patchwork)
 library(here)
+library(scales)
 # devtools::install_github('timcdlucas/INLAutils')
 
 # Local data directory
