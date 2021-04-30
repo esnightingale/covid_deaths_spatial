@@ -17,6 +17,9 @@ list.files(here::here("code","utils"), full.names = TRUE) %>% walk(source)
 measure <- "deaths"
 wave <- 1
 
+figdir <- "figures/final"
+outdir <- "output/final"
+
 ## Shapefiles
 regions <- readRDS(paste0(datadir,"maps/LA_shp_wpops.rds")) %>%
   filter(grepl("E", lad19cd))
@@ -24,7 +27,7 @@ border <- st_union(regions)
 
 # LTLA-week-aggregated observed deaths, expected deaths and LTLA covariates
 # (first and second waves)
-dat_all <- readRDS(here::here("data",paste0(measure,".rds")))
+dat_all <- readRDS(here::here("data","deaths.rds"))
 
 dat <- dat_all[[wave]] 
 dat$n[dat$wk_since_first < 0] <- NA
@@ -54,7 +57,7 @@ nsims <- length(samples_final)
 
 pits <- lapply(fits, pit_hist, bins= 50)
 
-png(here::here("figures",measure,"pit.png"), height = 1000, width = 1600, res = 150)
+png(here::here(figdir,"pit.png"), height = 1000, width = 1600, res = 150)
 (pits[[1]] + pits[[2]] + pits[[3]])/(pits[[4]] + pits[[5]] + pits[[6]])
 dev.off()
 
@@ -64,7 +67,7 @@ dev.off()
 table <- model_comp(fits)
 table
 
-write.csv(table, here::here("output",paste0("model_comp.csv")), row.names = F)
+write.csv(table, here::here(outdir,paste0("model_comp.csv")), row.names = F)
 
 # ---------------------------------------------------------------------------- #
 # FIXED EFFECTS
@@ -72,7 +75,7 @@ write.csv(table, here::here("output",paste0("model_comp.csv")), row.names = F)
 coeffs <- lapply(fits, get_coeffs)
 coeffs
 
-saveRDS(coeffs, here::here("output",paste0("model_coeffs.rds")))
+saveRDS(coeffs, here::here(outdir,paste0("model_coeffs.rds")))
         
 # ---------------------------------------------------------------------------- #
 # MAP MODEL MSE
@@ -94,7 +97,7 @@ resids <- lapply(fits, function(fit) get_resid(fit)$resid) %>%
 dat_resid <- bind_cols(dat, resids) 
 
 dat_resid %>%  pivot_longer(cols = base:BYM_geog) %>% group_by(name) %>% summarise(median = median(value, na.rm = T), mean = mean(value, na.rm = T)) -> avg_resid
-png(here::here("figures",measure,"map_resids_6mods_mean.png"), height = 1000, width = 1600, res = 150)
+png(here::here(figdir,"map_resids_6mods.png"), height = 1000, width = 1600, res = 150)
 dat_resid %>%
   pivot_longer(cols = base:BYM_geog) %>% 
   group_by(lad19cd, name) %>%
@@ -121,7 +124,7 @@ logs <- lapply(fits, function(fit) get_resid(fit)$logs) %>%
 
 dat_logs <- bind_cols(dat, logs) 
 
-png(here::here("figures",measure,"map_logs_6mods_mean.png"), height = 1000, width = 1600, res = 150)
+png(here::here(figdir,"map_logs_6mods.png"), height = 1000, width = 1600, res = 150)
 dat_logs %>%
   pivot_longer(cols = base:BYM_geog) %>% 
   group_by(lad19cd, name) %>%

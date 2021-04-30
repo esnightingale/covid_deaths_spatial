@@ -17,6 +17,9 @@ list.files(here::here("code","utils"), full.names = TRUE) %>% walk(source)
 measure <- "deaths"
 wave <- 1
 
+figdir <- "figures/deaths"
+outdir <- "output/final"
+
 ## Shapefiles
 regions <- readRDS(paste0(datadir,"maps/LA_shp_wpops.rds")) %>%
   filter(grepl("E", lad19cd))
@@ -24,7 +27,7 @@ border <- st_union(regions)
 
 # LTLA-week-aggregated observed deaths, expected deaths and LTLA covariates
 # (first and second waves)
-dat_all <- readRDS(here::here("data",paste0(measure,".rds")))
+dat_all <- readRDS(here::here("data","deaths.rds"))
 
 dat <- dat_all[[wave]] 
 dat$n[dat$wk_since_first < 0] <- NA
@@ -46,14 +49,13 @@ samples_final <- readRDS(file = here::here("output",
 
 nsims <- length(samples_final)
 
-
 # ---------------------------------------------------------------------------- #
 # All parameter posteriors
 
-pdf(here::here("figures",measure,"parms_fixed.pdf"))
+pdf(here::here(figdir,"parms_fixed.pdf"))
 lapply(names(fit_final$marginals.fixed), plot_parm, fit = fit_final, opt = 1)
 dev.off()
-pdf(here::here("figures",measure,"parms_hyper.pdf"))
+pdf(here::here(figdir,"parms_hyper.pdf"))
 lapply(names(fit_final$marginals.hyperpar), fit = fit_final, plot_parm, opt = 2)
 dev.off()
 
@@ -69,7 +71,7 @@ inla.zmarginal(inla.tmarginal(function(x) exp(x/100), fit_final$marginals.fixed[
 
 get_coeffs(fit_final)
 
-png(here::here("figures",measure,"covariates_final.png"), height = 800, width = 1000, res = 150)
+png(here::here(figdir,"covariates_final.png"), height = 800, width = 1000, res = 150)
 fit_final %>% 
   get_coeffs() %>% 
   slice(-1) %>%
@@ -102,7 +104,7 @@ dat_w %>%
   labs(x = "", col = "Geography", y = "Trend") +
   theme_minimal() -> plot_rw
 
-png(here::here("figures",measure,"temp_re.png"), height = 1000, width = 1800, res = 200)
+png(here::here(figdir,"temp_re.png"), height = 1000, width = 1800, res = 200)
 plot_rw
 dev.off()
 
@@ -124,7 +126,7 @@ regions %>%
   labs(subtitle = "Decomposition of fitted spatial random effects", fill = "") +
   scale_fill_gradient2() -> map_sp_re
 
-png(here::here("figures",measure,"death_spatial_re.png"), height = 1000, width = 1800, res = 200)
+png(here::here(figdir,"death_spatial_re.png"), height = 1000, width = 1800, res = 200)
 map_sp_re
 dev.off()
 
@@ -152,7 +154,7 @@ plot_la_fit <- function(id){
     return()
 }
 
-png(here::here("figures",measure,"ltla_hi_IID.png"), height = 1200, width = 1200, res = 200)
+png(here::here(figdir,"ltla_hi_IID.png"), height = 1200, width = 1200, res = 200)
 plot_la_fit(hi_IID)
 dev.off()
 
@@ -163,7 +165,7 @@ sp_re %>%
   pull(lad19cd) %>%
   unique() -> low_IID
 
-png(here::here("figures",measure,"ltla_lo_IID.png"), height = 1200, width = 1200, res = 200)
+png(here::here(figdir,"ltla_lo_IID.png"), height = 1200, width = 1200, res = 200)
 plot_la_fit(low_IID)
 dev.off()
 
@@ -206,7 +208,7 @@ ggplot(as.data.frame(dat_plot_geog)) +
   labs(x = "Calendar week", y = "Rate per 100,000", title = "Total fit over time, by calendar week and geography", subtitle = paste0("Observed rates shown in white, with ", nsims, " posterior samples"), col = "Geography") +
   theme(legend.position = c(0.2,0.7))  -> plot_fit_time_geog
 
-png(here::here("figures",measure,"fit_total_geog.png"), height = 1500, width = 1500, res = 200)
+png(here::here(figdir,"fit_total_geog.png"), height = 1500, width = 1500, res = 200)
 plot_fit_time / plot_fit_time_geog
 dev.off()
 
@@ -239,11 +241,11 @@ plot_fit_la <- function(plotdata){
 }
 
 la_samp <- sample(unique(dat$lad19nm),9)
-png(here::here("figures",measure,"fit_lasamp.png"), height = 1000, width = 1500, res = 200)
+png(here::here(figdir,"fit_lasamp.png"), height = 1000, width = 1500, res = 200)
 plot_fit_la(as.data.frame(agg_sims[lad19nm %in% la_samp]))
 dev.off()
 
-pdf(here::here("figures",measure,"fit_all_ltlas.pdf"), height = 25, width = 25)
+pdf(here::here(figdir,"fit_all_ltlas.pdf"), height = 25, width = 25)
 plot_fit_la(as.data.frame(agg_sims))
 dev.off()
 
@@ -259,7 +261,7 @@ dat_la <- dat %>%
   summarise(Median = mean(RR, na.rm = TRUE), Lower = mean(LL, na.rm = TRUE), Upper = mean(UL, na.rm = TRUE)) %>%
   as.data.frame()
 
-png(here::here("figures",measure,"fitted_RR_CrI.png"), height = 1000, width = 1800, res = 200)
+png(here::here(figdir,"fitted_RR_CrI.png"), height = 1000, width = 1800, res = 200)
 regions %>%
   full_join(pivot_longer(dat_la, cols = c("Lower","Median","Upper"))) %>%
   basic_map(fill = "value", plot.border = T, scale = F) +
@@ -276,11 +278,11 @@ dat_la %>%
 dat_la %>%
   slice_min(n = 6, Median) -> low_RR
 
-png(here::here("figures",measure,"high_RR.png"), width = 1800, height = 1000, res = 200)
+png(here::here(figdir,"high_RR.png"), width = 1800, height = 1000, res = 200)
 plot_fit_la(as.data.frame(agg_sims[lad19cd %in% high_RR$lad19cd]))
 dev.off()
 
-png(here::here("figures",measure,"low_RR.png"), width = 1800, height = 1000, res = 200)
+png(here::here(figdir,"low_RR.png"), width = 1800, height = 1000, res = 200)
 plot_fit_la(as.data.frame(agg_sims[lad19cd %in% low_RR$lad19cd]))
 dev.off()
 
