@@ -1,65 +1,57 @@
 get_cfr <- function(sims, cases, lag, plot = F){
   
-  # Gives saved version of reconstructions
+  # Join posterior predictions of deaths (averaging out covariates) with observed cases
+  # Inner join to keep only overlapping weeks after lagging
+  # Estimate CFR per week/per LTLA as cases/predicted deaths
+  # Set CFR as NA if cases or pred deaths = 0
   sims %>%
     as.data.frame() %>%
     mutate(week = week-lag) %>%
-    rename(sim = variable) %>% 
-    full_join(dplyr::select(cases,lad19nm,geography,week,n), by = c("lad19nm","week","geography"), suffix = c("_d","_c")) %>% 
-    mutate(CFR = (n_c/pred_n), #*(pred_n >=1)
+    rename(sim = variable) %>%
+    inner_join(dplyr::select(cases,lad19nm,geography,week,n), by = c("lad19nm","week","geography"), suffix = c("_d","_c")) %>% 
+    mutate(CFR = (n_c/pred_n)*(pred_n > 0),
            period = case_when(week < ymd("2020-05-18") ~ 1,
                               week >= ymd("2020-05-18") ~ 2)) %>%
-    # mutate(CFR= na_if(CFR, 0)) %>%
-    # Only include values where 
-    filter(is.finite(CFR) & CFR > 0) %>%
+    mutate(CFR = na_if(CFR, 0)) %>%
     ungroup() -> ratio
   
-  # New version keeping all rows but CFR NA if cases or deaths == 0
-  sims %>%
-    as.data.frame() %>%
-    mutate(week = week-lag) %>%
-    rename(sim = variable) %>% 
-    full_join(dplyr::select(cases,lad19nm,geography,week,n), by = c("lad19nm","week","geography"), suffix = c("_d","_c")) %>% 
-    mutate(CFR = (n_c/pred_n)*(pred_n > 0), 
-           period = case_when(week < ymd("2020-05-18") ~ 1,
-                              week >= ymd("2020-05-18") ~ 2)) %>%
-    mutate(CFR= na_if(CFR, 0)) %>%
-    ungroup() -> ratio
+  # Check output for one sim
+  View(filter(ratio, sim == 1))
   
-  View(filter(ratio, sim== 1))
-  
-  ratio %>% 
-    summarise(med = median(CFR, na.rm = TRUE),
-              q1 = quantile(CFR, p = 0.25, na.rm = TRUE),
-              q3 = quantile(CFR, p = 0.75, na.rm = TRUE)) %>%
+  # Summarise non-missing CFRs overall, by LA and by week
+  ratio_nona <- filter(ratio, !is.na(CFR))
+  ratio_nona %>% 
+    summarise(med = median(CFR),
+              q1 = quantile(CFR, p = 0.25),
+              q3 = quantile(CFR, p = 0.75)) %>%
     print()
   
-  ratio %>% 
+  ratio_nona %>% 
     group_by(period) %>%
-    summarise(med = median(CFR, na.rm = TRUE),
-              q1 = quantile(CFR, p = 0.25, na.rm = TRUE),
-              q3 = quantile(CFR, p = 0.75, na.rm = TRUE)) %>%
+    summarise(med = median(CFR),
+              q1 = quantile(CFR, p = 0.25),
+              q3 = quantile(CFR, p = 0.75)) %>%
     print()
   
-  ratio %>% 
+  ratio_nona %>% 
     group_by(geography,period) %>%
-    summarise(med = median(CFR, na.rm = TRUE),
-              q1 = quantile(CFR, p = 0.25, na.rm = TRUE),
-              q3 = quantile(CFR, p = 0.75, na.rm = TRUE)) %>%
+    summarise(med = median(CFR),
+              q1 = quantile(CFR, p = 0.25),
+              q3 = quantile(CFR, p = 0.75)) %>%
     print()
   
   if (plot == T){
     
-    ## Ratio per LTLA
-    ratio %>%
+    # Ratio per LTLA
+    ratio_nona %>%
       group_by(lad19nm, period, sim) %>%
       summarise(n_d = sum(n_d, na.rm = T),
                 n_c = sum(n_c, na.rm = T),
-                CFR = median(CFR, na.rm = T)) %>%
+                CFR = median(CFR)) %>%
       group_by(lad19nm, period) %>%
       summarise(n_d = median(n_d, na.rm = T),
                 n_c = median(n_c, na.rm = T),
-                CFR = median(CFR, na.rm = T)) %>%
+                CFR = median(CFR)) %>%
       ungroup() -> ratio_la
   
     print(summary(ratio_la$CFR[ratio_la$period == 1]))
@@ -67,7 +59,7 @@ get_cfr <- function(sims, cases, lag, plot = F){
   
     regions %>%
       full_join(ratio_la) %>%
-      mutate(period = factor(period,labels = c("2020-01-01 - 2020-05-17","2020-05-18 - 2020-06-30"))) %>%
+      mutate(period = factor(period,labels = c("Pre-pillar 2","Post-pillar 2"))) %>%
       basic_map(fill = "CFR", scale = F) +
       scale_fill_viridis_c(trans = "log2") +
       facet_wrap(~period, ncol = 2) +
@@ -75,18 +67,18 @@ get_cfr <- function(sims, cases, lag, plot = F){
            fill = "Ratio",
            caption = paste("Ratios where no. deaths or no. cases = 0 are not calculated")) -> maps
   
-    ## Ratio per week
-    ratio %>%
+    # Ratio per week
+    ratio_nona %>%
       group_by(week, period, sim) %>%
       summarise(n_d = sum(n_d, na.rm = T),
                 n_c = sum(n_c, na.rm = T),
-                CFR = median(CFR, na.rm = T)) %>%
+                CFR = median(CFR)) %>%
       group_by(week, period) %>%
-      summarise(med = median(CFR, na.rm = T),
-                l1 = quantile(CFR, 0.01, na.rm = T),
-                l2 = quantile(CFR, 0.25, na.rm = T),
-                h2 = quantile(CFR, 0.75, na.rm = T),
-                h1 = quantile(CFR, 0.99, na.rm = T)) %>%
+      summarise(med = median(CFR),
+                l1 = quantile(CFR, 0.01),
+                l2 = quantile(CFR, 0.25),
+                h2 = quantile(CFR, 0.75),
+                h1 = quantile(CFR, 0.99)) %>%
       ungroup() -> ratio_wk
     
     ratio_wk %>%
