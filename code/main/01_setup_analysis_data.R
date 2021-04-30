@@ -28,7 +28,7 @@ waves <- list(first = c(ymd("2020-01-01"), ymd("2020-06-30")),
               second = c(ymd("2020-07-01"), ymd("2020-12-02")))
 
 ## DEATHS ##
-source(here::here("code","main","00_setup_deaths.R"))
+source(here::here("code","main","00_3_setup_deaths.R"))
 
 deaths <- lapply(waves,
                  function(wave) setup_analysis_data(alldata, 
@@ -42,7 +42,7 @@ saveRDS(deaths, here::here("data","deaths.rds"))
 
 
 ## CASES ##
-source(here::here("code","main","00_setup_cases.R"))
+source(here::here("code","main","00_4_setup_cases.R"))
 
 cases <- lapply(waves,
                 function(wave) setup_analysis_data(alldata, 
