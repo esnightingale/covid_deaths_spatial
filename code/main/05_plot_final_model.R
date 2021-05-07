@@ -102,18 +102,20 @@ sp_re <- data.frame(lad19cd = unique(dat$lad19cd),
                     tau = fit_final$summary.hyperpar["Precision for la","0.5quant"],
                     phi = fit_final$summary.hyperpar["Phi for la","0.5quant"],
                     Total = fit_final$summary.random$la[1:nrow(regions),"0.5quant"], 
-                    Besag = fit_final$summary.random$la[(nrow(regions)+1):(2*nrow(regions)),"0.5quant"]) %>% 
-  mutate(IID = (Total*sqrt(tau) - Besag*sqrt(phi))/sqrt(1-phi)) %>%
-  pivot_longer(c("Total","Besag","IID"))
+                    Structured = fit_final$summary.random$la[(nrow(regions)+1):(2*nrow(regions)),"0.5quant"]) %>% 
+  mutate(Unstructured = (Total*sqrt(tau) - Structured*sqrt(phi))/sqrt(1-phi)) %>%
+  pivot_longer(c("Total","Structured","Unstructured")) %>%
+  mutate(name = factor(name, levels = c("Structured","Unstructured","Total")))
 
 regions %>%
   full_join(sp_re) %>%
   basic_map(fill = "value", scale = FALSE, plot.border = T) + 
   facet_wrap(~name) +
   labs(subtitle = "Decomposition of fitted spatial random effects", fill = "") +
-  scale_fill_gradient2() -> map_sp_re
+  scale_fill_gradient2() +
+  theme(legend.position = c(0.05,0.5)) -> map_sp_re
 
-png(here::here(figdir,"death_spatial_re.png"), height = 1000, width = 1800, res = 200)
+png(here::here(figdir,"death_spatial_re.png"), height = 1200, width = 2400, res = 300)
 map_sp_re
 dev.off()
 
@@ -187,20 +189,23 @@ dat_plot_geog <- dat_plot_geog[, group := paste(variable, geography)]
 ggplot(as.data.frame(dat_plot_tot)) + 
   geom_line(aes(week, pred_n*1e5/pop, group = variable), alpha = 0.1, col = "grey") +
   geom_point(aes(week, obs*1e5/pop)) + 
-  labs(x = "Calendar week", y = "Rate per 100,000", 
-       title = "Total fit over time, by calendar week", 
-       subtitle = paste0("Observed rates shown in black, with ", nsims, " posterior samples in grey")) -> plot_fit_time
+  scale_x_date(breaks = "month", date_labels = "%b") +
+  labs(
+       # title = "Total fit over time, by calendar week", 
+       # subtitle = paste0("Observed rates shown in black, with ", nsims, " posterior samples in grey")
+       x = "", y = "Rate per 100,000") -> plot_fit_time
 
 ggplot(as.data.frame(dat_plot_geog)) + 
   geom_line(aes(week, pred_n*1e5/pop, group = group, col = geography), alpha = 0.1) +
-  geom_point(aes(week, obs*1e5/pop, col = geography), pch = 21, fill = "white") + 
-  labs(x = "Calendar week", y = "Rate per 100,000", 
-       title = "Total fit over time, by calendar week and geography", 
-       subtitle = paste0("Observed rates shown in white, with ", nsims, " posterior samples"), 
-       col = "Geography") +
+  geom_point(aes(week, obs*1e5/pop, col = geography), pch = 21, fill = "white") +
+  scale_x_date(breaks = "month", date_labels = "%b") +
+  labs(
+    # title = "Total fit over time, by calendar week and geography", 
+    # subtitle = paste0("Observed rates shown in white, with ", nsims, " posterior samples"),
+    x = "Calendar week", y = "Rate per 100,000", col = "Geography") +
   theme(legend.position = c(0.2,0.7))  -> plot_fit_time_geog
 
-png(here::here(figdir,"fit_total_geog.png"), height = 1500, width = 1500, res = 200)
+png(here::here(figdir,"fit_total_geog.png"), height = 1800, width = 2400, res = 300)
 plot_fit_time / plot_fit_time_geog
 dev.off()
 

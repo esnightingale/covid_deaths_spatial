@@ -136,7 +136,7 @@ map_imd <-
 
 map_mino <-
   basic_map(regions_wcovs, fill = "prop_minority", scale = F) +
-  labs(fill = "", title = "Proportion of black and \nminority ethnic population") +
+  labs(fill = "", title = "Proportion of minority \nethnicities in population") +
   scale_fill_viridis_c(trans = "log10") +
   theme(plot.title = element_text(size=10))
 
@@ -145,7 +145,7 @@ map_age <-
   labs(fill = "", title = "Median age") +
   theme(plot.title = element_text(size=10))
 
-png(here::here(figdir,"map_covariates.png"), height = 1200, width = 1200, res = 150)
+png(here::here(figdir,"map_covariates.png"), height = 2000, width = 2000, res = 300)
 (map_age + map_pop) /
   (map_mino + map_imd)
 dev.off()
