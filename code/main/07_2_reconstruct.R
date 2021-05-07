@@ -35,7 +35,7 @@ cases <- readRDS(here::here("data","cases.rds"))[[1]]
 # + [agg_sims] Aggregate posteriors over country/geography/LTLA
 # + [plot_reconstr] Plot quantiles alongside observed cases
 
-reconstruct7 <- reconstruct(sims_long, cases, lag = 7, plot = F, suffix = "")
+reconstruct7 <- reconstruct(sims_long, cases, lag = 7, plot = T, suffix = "")
 reconstruct14 <- reconstruct(sims_long, cases, lag = 14, plot = T, suffix = "")
 reconstruct21 <- reconstruct(sims_long, cases, lag = 21, plot = T, suffix = "")
 
@@ -48,6 +48,7 @@ saveRDS(reconstruct21, here::here(outdir,"reconstruct_lag21.rds"))
 # period 2  5.37  3.07  9.09
 
 # Check plot for a sample of LTLAs
+la_samp <- sample(unique(dat$lad19nm),9)
 plot_reconst(reconstruct7$la, 7, sample = la_samp, save = F, h = 10, w = 12)
 
 # plot_reconst(reconstruct7$total, 7, save = T, title = F, caption = F)

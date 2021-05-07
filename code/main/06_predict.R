@@ -14,7 +14,7 @@
 ################################################################################
 
 # Neighbourhood graph
-g <- inla.read.graph(filename = paste0(datadir,"maps/regions_eng.adj"))
+g <- inla.read.graph(filename = here::here("data","regions_eng.adj"))
 
 # LTLA-week-aggregated observed deaths, expected deaths and LTLA covariates
 # (first and second waves)
@@ -95,7 +95,7 @@ summary(fit_pred)
 # Samples are of *marginal* densities
 samples_pred <- inla.posterior.sample(n = nsims, fit_pred)
 
-saveRDS(list(fit = fit_pred, samples = samples_pred, dat = dat_pred), file = here::here("output","fit_samples_avgcov.rds"))
+saveRDS(list(fit = fit_pred, samples = samples_pred, dat = dat_pred), file = here::here(outdir,"fit_samples_avgcov.rds"))
 
 
 ######################################
@@ -134,5 +134,5 @@ summary(fit_nocov)
 # Samples are of *marginal* densities
 samples_nocov <- inla.posterior.sample(n = nsims, fit_nocov)
 
-saveRDS(list(fit = fit_nocov, samples = samples_nocov, dat = dat), file = here::here("output","fit_samples_nocov.rds"))
+saveRDS(list(fit = fit_nocov, samples = samples_nocov, dat = dat), file = here::here(outdir,"fit_samples_nocov.rds"))
 

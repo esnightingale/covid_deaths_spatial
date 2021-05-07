@@ -18,16 +18,16 @@ library(dtplyr)
 dat <- readRDS(here::here("data","deaths.rds"))
 dat <- dat[["first"]] 
 
-pred_avgcov <- readRDS(here::here("output","fit_samples_avgcov.rds"))
+pred_avgcov <- readRDS(here::here(outdir,"fit_samples_avgcov.rds"))
 fit_pred <- pred_avgcov$fit
 samples_pred <- pred_avgcov$samples
 dat_pred <- pred_avgcov$dat
 
-# sims <- as.data.table(dplyr::bind_cols(lapply(samples_pred, get_preds, dat_pred)))
-# saveRDS(sims, file = here::here("output","sims_avgcov.rds"))
+sims <- as.data.table(dplyr::bind_cols(lapply(samples_pred, get_preds, dat_pred)))
+# saveRDS(sims, file = here::here(outdir,"sims_avgcov.rds"))
 
 # Predictions at average covariates
-sims <- readRDS(file = here::here("output","sims_avgcov.rds"))
+sims <- readRDS(file = here::here(outdir,"sims_avgcov.rds"))
 data.table::setDT(sims)
 
 cases <- readRDS(here::here("data","cases.rds"))[[1]] %>%
@@ -79,7 +79,7 @@ dat %>%
 
 plot_geog <- merge(dat_geog, plot_geog)
 
-png(here::here("figures","deaths","pred_avgcov_geog.png"), height = 1000, width = 1200, res = 150)
+png(here::here(figdir,"pred_avgcov_geog.png"), height = 1000, width = 1200, res = 150)
 print(
   data.table::setDF(plot_geog) %>%
     ggplot() + 
@@ -95,46 +95,16 @@ dev.off()
 la_samp <- sample(unique(dat$lad19nm),9)
 agg_sims$lad19nm <- dat$lad19nm
 agg_sims$n <- dat$n
-png(here::here("figures","deaths","pred_avgcov_lasamp.png"), height = 1000, width = 1200, res = 150)
+png(here::here(figdir,"pred_avgcov_lasamp.png"), height = 1000, width = 1200, res = 150)
 ggplot(as.data.frame(agg_sims[lad19nm %in% la_samp]),
        aes(week, q50)) +
-  geom_ribbon(aes(ymin = q05, ymax = q95), alpha = 0.2) +
-  geom_ribbon(aes(ymin = q25, ymax = q75), alpha = 0.2) +
-  geom_line() +
+  geom_ribbon(aes(ymin = q05, ymax = q95), alpha = 0.2, fill = "steelblue") +
+  geom_ribbon(aes(ymin = q25, ymax = q75), alpha = 0.2, fill = "steelblue") +
+  geom_line(col = "steelblue") +
   geom_point(aes(y = n)) +
   facet_wrap(~lad19nm, scales = "free") +
   theme_minimal()
 dev.off()
-
-# lag <- 7
-# agg_sims_lag <- agg_sims
-# agg_sims_lag$week <- agg_sims_lag$week - lag
-# agg_sims_lag <- merge(agg_sims_lag, cases[,c("week","lad19nm","cases")], by = c("week","lad19nm"))
-# pdf(here::here("figures","deaths","pred_avgcov_wcases.pdf"), height = 50, width = 50)
-# ggplot(as.data.frame(agg_sims_lag),
-#        aes(week, q50*5)) +
-#   geom_ribbon(aes(ymin = q05*5, ymax = q95*5, fill = geography), alpha = 0.2) +
-#   geom_ribbon(aes(ymin = q25*5, ymax = q75*5, fill = geography), alpha = 0.2) +
-#   geom_line(aes(col = geography)) +
-#   geom_line(aes(y = cases), lty = "dashed", col = "darkgrey", lwd = 0.5) +
-#   geom_point(aes(y = n*5), cex = 0.5, col= "darkgrey",pch = 20) +
-#   facet_wrap(~lad19nm, scales = "free") +
-#   labs(title = "Covariate-adjusted predicted deaths lagged by one week and rescaled by the median CFR post-P2 expansion (5 cases per death)",
-#        subtitle = "Confirmed cases indicated by the dashed line. Observed deaths indicated by points. Predictions are coloured by geography type.",
-#        y = "Rescaled weekly deaths",
-#        x = "") +
-#   theme_minimal()
-# dev.off()
-# 
-# pred_nocov <- readRDS(here::here("output","fit_samples_nocov.rds"))
-# fit_nocov <- pred_nocov$fit
-# samples_nocov <- pred_nocov$samples
-
-# sims <- as.data.table(dplyr::bind_cols(lapply(samples_nocov, get_preds, dat)))
-# saveRDS(sims, file = here::here("output","sims_nocov.rds"))
-
-# Predictions without covariates
-# sims <- readRDS(file = here::here("output","sims_nocov.rds"))
 
 
 ###############################################################################

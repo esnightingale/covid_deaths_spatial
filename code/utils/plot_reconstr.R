@@ -1,12 +1,12 @@
-plot_reconst <- function(agg_sims, lag, sample = NA, title = T, caption = T,
-                         save = T, suffix = "", h = 1400, w = 2000, res = 300, format = "png"){
+plot_reconst <- function(agg_sims, lag, sample = NA, order = F, title = T, caption = T,
+                         save = T, figdir = "figures", suffix = "", h = 1400, w = 2000, res = 300, format = "png"){
   
   plot.data <- agg_sims$preds
   
   if (agg_sims$type == "la"){
     suffix <- paste0(suffix, "_la")
     plot.data$facet <- plot.data$lad19nm
-    if (!is.na(sample)){
+    if (length(sample) > 0){
       plot.data <- dplyr::filter(plot.data, lad19nm %in% sample) 
       suffix <- paste0(suffix, "samp")
       if(order == F){
