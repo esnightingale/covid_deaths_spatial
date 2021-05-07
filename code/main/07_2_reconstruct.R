@@ -50,5 +50,8 @@ saveRDS(reconstruct21, here::here(outdir,"reconstruct_lag21.rds"))
 # Check plot for a sample of LTLAs
 plot_reconst(reconstruct7$la, 7, sample = la_samp, save = F, h = 10, w = 12)
 
+# plot_reconst(reconstruct7$total, 7, save = T, title = F, caption = F)
+# plot_reconst(reconstruct7$geog, 7, save = T, title = F, caption = F)
+
 ###############################################################################
 ###############################################################################

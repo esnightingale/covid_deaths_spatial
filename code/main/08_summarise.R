@@ -26,21 +26,46 @@ reconstruct7$sims %>%
                    obs = sum(n_c, na.rm = T)) %>%
   dplyr::group_by(lad19nm) %>%
   dplyr::summarise(med = median(pred),
+                   lq = quantile(pred,  0.01),
+                   uq = median(pred, 0.99),
                    obs = median(obs)) %>% 
   dplyr::ungroup() %>%
-  dplyr::mutate(obs_med = obs/med) -> obs_pred_la
+  dplyr::mutate(obs_med = obs/med,
+                iqr = uq-lq) -> obs_pred_la
 
 summary(obs_pred_la$obs_med)
 # Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
 # 0.2630  0.5960  0.9201  1.0722  1.3349  3.8052  
 
+summary(obs_pred_la$iqr)
+# Min.  1st Qu.   Median     Mean  3rd Qu.     Max. 
+# 2.913   82.461  169.170  285.194  356.515 4492.398 
+
 # Map out relative difference in cumulative totals per LTLA
-png(here::here(figdir,"underascertainment_space_lag7.png"), height = 1500, width = 2000, res = 250)
+png(here::here(figdir,"underascertainment_space_lag7.png"), height = 1500, width = 2000, res = 300)
 regions %>% 
   dplyr::full_join(obs_pred_la) %>%
   basic_map(fill = "obs_med", plot.border = T) +
   scale_fill_gradient2(midpoint = 0, trans = "log2") +
+  labs(fill = "") +
   theme(legend.position = c(0.2, 0.5))
+dev.off()
+
+# pal <- viridis::viridis(3)
+# barplot(rep(1,3), col = pal)
+png(here::here(figdir,"underascertainment_space_lag7_newpal.png"), height = 1500, width = 2000, res = 300)
+regions %>% 
+  dplyr::full_join(obs_pred_la) %>%
+ggplot() +
+  # Base layer to avoid gaps with missing fill values when faceting
+  geom_sf(data = regions, aes(geometry = geometry), fill = "grey", colour = NA) +
+  geom_sf(aes(geometry = geometry, fill = obs_med, alpha = med), colour = NA) +
+  scale_fill_gradient2(low = "firebrick", mid = "yellow", high = "steelblue", midpoint = 0, trans = "log2") +
+  # scale_fill_gradient2(low = pal[1], mid = pal[3], high = pal[2], midpoint = 0, trans = "log2") + 
+  scale_alpha_continuous(trans = "log10") +
+  labs(fill = "Observed/predicted", alpha = "Total predicted") + #"1-99% quantile range"
+  annotation_scale(location = "br") +
+  map_theme() 
 dev.off()
 
 # ---------------------------------------------------------------------------- #
@@ -71,14 +96,14 @@ summary(obs_pred_time)
 
 # Plot relative differences in national total per week 
 scaleFUN <- function(x) sprintf("%.1f", x)
-png(here::here(figdir,"underascertainment_time_lag7.png"), height = 1200, width = 1800, res = 250)
+png(here::here(figdir,"underascertainment_time_lag7.png"), height = 1200, width = 1800, res = 300)
 obs_pred_time %>%
   filter(obs > 0) %>%
   ggplot(aes(week, med)) +
   geom_ribbon(aes(ymin = l1, ymax = h1), alpha = 0.2, fill = "steelblue") +
   geom_ribbon(aes(ymin = l2, ymax = h2), alpha = 0.2, fill = "steelblue") +
   geom_line(aes(y = med), col = "steelblue") +
-  # scale_x_date(limits = c(ymd("2020-02-01",ymd("2020-06-17")))) +
+  scale_x_date(breaks = "month", date_labels = "%b") +
   scale_y_continuous(trans = "log2", 
                      labels = scales::number_format(accuracy = 0.01)) +
   geom_vline(xintercept = ymd("2020-04-15"), col = "red") +
@@ -109,7 +134,7 @@ cases %>%
   group_by(week) %>%
   summarise(obs = sum(n)) -> obs_wk
 
-png(here::here(figdir,"compare_lags.png"), height = 1400, width = 2200, res = 250)
+png(here::here(figdir,"compare_lags.png"), height = 1400, width = 2200, res = 300)
 ggplot(lagcomp, aes(week)) + 
   geom_ribbon(aes(ymin = l1, ymax = h1, fill = Lag), alpha = 0.2) +
   geom_ribbon(aes(ymin = l2, ymax = h2, fill = Lag), alpha = 0.2) +
@@ -117,10 +142,11 @@ ggplot(lagcomp, aes(week)) +
   geom_point(data = obs_wk, aes(y = obs)) +
   scale_fill_viridis_d(begin = 0.2, end = 0.8) +
   scale_colour_viridis_d(begin = 0.2, end = 0.8) +
-  scale_x_date() +
-  labs(x = "",y = "", 
-       title = "Reconstruction of confirmed cases from COVID-19-related deaths across England",
-       subtitle = "Comparison of assumed lags between case confirmation and death") +
+  scale_x_date(breaks = "month", date_labels = "%b") +
+  labs(x = "",y = "" 
+       #, title = "Reconstruction of confirmed cases from COVID-19-related deaths across England",
+       # subtitle = "Comparison of assumed lags between case confirmation and death"
+       ) +
   theme_minimal() +
   theme(legend.position = c(0.8,0.8))
 dev.off()

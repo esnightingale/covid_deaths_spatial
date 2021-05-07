@@ -1,4 +1,5 @@
-plot_reconst <- function(agg_sims, lag, sample = NA, save = T, suffix = "", h = 1200, w = 1800, order = T, format = "png"){
+plot_reconst <- function(agg_sims, lag, sample = NA, title = T, caption = T,
+                         save = T, suffix = "", h = 1400, w = 2000, res = 300, format = "png"){
   
   plot.data <- agg_sims$preds
   
@@ -32,15 +33,7 @@ plot_reconst <- function(agg_sims, lag, sample = NA, save = T, suffix = "", h = 
     geom_ribbon(aes(ymin = l2, ymax = h2), alpha = 0.2, fill = "steelblue") +
     geom_line(aes(y = med), col = "steelblue") +
     geom_point(aes(y = obs)) +
-    labs(x = "",y = "Confirmed case count", title = "Reconstruction of confirmed cases from COVID-19-related deaths",
-         caption = paste0("Median, ",
-                          (plot_quants[3]-plot_quants[2])*100, " and ",
-                          (plot_quants[4]-plot_quants[1])*100,
-                          "% quantile intervals over ", nsims, " posterior simulations, scaled by ",
-                          # samples_cfr, 
-                          # "samples from",
-                          min(scale_quants)*100,"% to ", max(scale_quants)*100,"% quantiles of",
-                          " LTLA-specific CFR post-P2 expansion.")) +
+    labs(x = "",y = "Confirmed case count") +
     theme_minimal()
   
   if (agg_sims$type != "total"){
@@ -48,13 +41,30 @@ plot_reconst <- function(agg_sims, lag, sample = NA, save = T, suffix = "", h = 
       facet_wrap(~facet, scales = "free") 
   }
 
+  if (title == T){
+    p <- p + 
+      labs(title = "Reconstruction of confirmed cases from COVID-19-related deaths")
+  }
+  
+  if (caption == T){
+    p <- p + 
+      labs(caption = paste0("Median, ",
+                            (plot_quants[3]-plot_quants[2])*100, " and ",
+                            (plot_quants[4]-plot_quants[1])*100,
+                            "% quantile intervals over ", nsims, " posterior simulations, scaled by ",
+                            # samples_cfr, 
+                            # "samples from",
+                            min(scale_quants)*100,"% to ", max(scale_quants)*100,"% quantiles of",
+                            " LTLA-specific CFR post-P2 expansion."))
+  }
+  
   if (save == T){
     if (format == "pdf"){  
       pdf(here::here(figdir,paste0("reconstr_lag",lag,suffix,".pdf")), height = h, width = w)
       print(p)
       dev.off()
     } else if(format == "png") {
-      png(here::here(figdir,paste0("reconstr_lag",lag,suffix,".png")), height = h, width = w, res = 200)
+      png(here::here(figdir,paste0("reconstr_lag",lag,suffix,".png")), height = h, width = w, res = res)
       print(p)
       dev.off()
     }
