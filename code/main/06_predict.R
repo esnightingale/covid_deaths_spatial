@@ -28,10 +28,10 @@ period <- dat_all$breaks[[wave]]
 nsims <- 1000
 
 # Fitted models and posterior samples
-fits <- readRDS(file = here::here("output",
+fits <- readRDS(file = here::here(outdir,
                                   sprintf("fits_%s_%s.rds",measure, wave)))
 fit_final <- fits[[6]]
-samples <- readRDS(file = here::here("output",
+samples <- readRDS(file = here::here(outdir,
                                      sprintf("samples_%s_%s.rds",measure, wave)))
 samples_final <- samples[[6]]
 
@@ -41,36 +41,7 @@ samples_final <- samples[[6]]
 #       PRIORS       #
 ######################
 
-# Specify priors as before, based on real data
-
-# SD over time
-dat %>%
-  group_by(w) %>%
-  summarise(n = sum(n, na.rm = TRUE), E = sum(E_wk)) %>%
-  mutate(rate = n/E) %>%
-  pull(rate) %>%
-  var() %>%
-  sqrt() -> sd_time
-
-# SD over space
-dat %>%
-  group_by(lad19cd) %>%
-  summarise(n = sum(n, na.rm = TRUE), E = unique(E_wk)) %>%
-  mutate(rate = n/E) %>%
-  pull(rate) %>%
-  var() %>%
-  sqrt() -> sd_space
-
-# => Less variation over space than over time
-
-# Undajusted for other covariates and structure so take these as upper bounds:
-prior.prec.tp <- list(prec = list(prior = "pc.prec",
-                                  param = c(sd_time/0.31, 0.01)))
-prior.prec.sp <- list(prec = list(prior = "pc.prec",
-                                  param = c(sd_space/0.31, 0.01)))
-
-prior.prec.sp
-prior.prec.tp
+priors <- set_priors()
 
 # ---------------------------------------------------------------------------- #
 
@@ -93,19 +64,19 @@ dat_pred <- bind_rows(dat, dat_avgcov) %>%
 
 f <- n ~ 
   IMD_quint + prop_minority + 
-  f(w, model = "rw1",
-    hyper = list(prec = prior.prec.tp),
-    scale.model = T) +
   f(wk_since_first, model = "rw2",
-    hyper = list(prec = prior.prec.tp),
+    hyper = list(prec = priors[["time1"]]),
     replicate = geog,
+    scale.model = T) +
+  f(w, model = "rw1",
+    hyper = list(prec = priors[["time2"]]),
     scale.model = T) +
   f(la, model = "bym2", graph = g,
     scale.model = T,
     constr = T,
     hyper=list(
       phi =list(param = c(0.5, 2/3)),
-      prec = prior.prec.sp) 
+      prec = priors[["space"]]) 
   )
 
 fit_pred <- INLA::inla(f,
@@ -132,19 +103,19 @@ saveRDS(list(fit = fit_pred, samples = samples_pred, dat = dat_pred), file = her
 ######################################
 
 f <- n ~  
-  f(w, model = "rw1",
-    hyper = list(prec = prior.prec.tp),
-    scale.model = T) +
   f(wk_since_first, model = "rw2",
-    hyper = list(prec = prior.prec.tp),
+    hyper = list(prec = priors[["time1"]]),
     replicate = geog,
+    scale.model = T) +
+  f(w, model = "rw1",
+    hyper = list(prec = priors[["time2"]]),
     scale.model = T) +
   f(la, model = "bym2", graph = g,
     scale.model = T,
     constr = T,
     hyper=list(
       phi =list(param = c(0.5, 2/3)),
-      prec = prior.prec.sp) 
+      prec = priors[["space"]]) 
   )
 
 fit_nocov <- INLA::inla(f,

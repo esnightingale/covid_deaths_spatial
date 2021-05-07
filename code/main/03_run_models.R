@@ -35,56 +35,7 @@ dat$n[dat$wk_since_first < 0] <- NA
 # Dispersion in RR (n/E) - variance ~2x mean
 var(dat$n/dat$E_wk, na.rm = TRUE)/mean(dat$n/dat$E_wk, na.rm = TRUE)
 
-nullmod <- MASS::glm.nb(n ~ IMD_quint + prop_minority + offset(log(E_wk)), dat)
-summary(nullmod)
-
-res <- residuals(nullmod)
-sd(res)
-
-dat %>%
-  filter(!is.na(n)) %>%
-  mutate(res = res) %>%
-  group_by(wk_since_first) %>%
-  summarise(res = mean(res)) %>%
-  pull(res) %>%
-  var(na.rm = TRUE) %>%
-  sqrt() -> sd_time1
-
-dat %>%
-  filter(!is.na(n)) %>%
-  mutate(res = res) %>%
-  group_by(w) %>%
-  summarise(res = mean(res)) %>%
-  pull(res) %>%
-  var(na.rm = TRUE) %>%
-  sqrt() -> sd_time2
-
-dat %>%
-  filter(!is.na(n)) %>%
-  mutate(res = res) %>%
-  group_by(lad19cd) %>%
-  summarise(res = mean(res)) %>%
-  pull(res) %>%
-  var(na.rm = TRUE) %>%
-  sqrt() -> sd_space
-
-# Undajusted for correlation structure so take these as upper bounds:
-prior.prec.tp1 <- list(prec = list(prior = "pc.prec",
-                                  param = c(sd_time1/0.31, 0.01)))
-prior.prec.tp2 <- list(prec = list(prior = "pc.prec",
-                                  param = c(sd_time2/0.31, 0.01)))
-prior.prec.sp <- list(prec = list(prior = "pc.prec",
-                                  param = c(sd_space/0.31, 0.01)))
-
-# Sample and plot priors on SD scale
-prior.samp.tp1 <- inla.pc.rprec(1000, u = sd_time1/0.31, alpha = 0.01)
-hist(1/sqrt(prior.samp.tp1), breaks = 100)
-
-prior.samp.tp2 <- inla.pc.rprec(1000, u = sd_time2/0.31, alpha = 0.01)
-hist(1/sqrt(prior.samp.tp2), breaks = 100)
-
-prior.samp.sp <- inla.pc.rprec(1000,u = sd_space/0.31, alpha = 0.01)
-hist(1/sqrt(prior.samp.sp), breaks = 100)
+priors <- set_priors()
 
 ################################################################################
 # FITTING
@@ -95,75 +46,76 @@ f_base <- n ~
   IMD_quint + prop_minority +
   # RW2 on epidemic week 
   f(wk_since_first, model = "rw2",
-    hyper = list(prec = prior.prec.tp1)) +
+    hyper = list(prec = priors[["time1"]]),
+    scale.model = T) +
   # RW1 on week overall
   f(w, model = "rw1",
-    hyper = list(prec = prior.prec.tp2)) 
+    hyper = list(prec = priors[["time2"]])) 
 
 ## No spatial effect, geography-dependent RW
 f_base_geog <- n ~ 
   IMD_quint + prop_minority +
   # RW2 on epidemic week, replicated by geography
   f(wk_since_first, model = "rw2",
-    hyper = list(prec = prior.prec.tp1),
+    hyper = list(prec = priors[["time1"]]),
     replicate = geog) +
   f(w, model = "rw1",
-    hyper = list(prec = prior.prec.tp2)) 
+    hyper = list(prec = priors[["time2"]])) 
 
 ## IID spatial
 f_iid <- n ~ 
   IMD_quint + prop_minority + 
   f(wk_since_first, model = "rw2",
-    hyper = list(prec = prior.prec.tp1)) +
+    hyper = list(prec = priors[["time1"]])) +
   f(w, model = "rw1",
-    hyper = list(prec = prior.prec.tp2)) +
+    hyper = list(prec = priors[["time2"]])) +
   f(la, model = "iid", 
     constr = T,
     hyper=list(
-      prec = prior.prec.sp
+      prec = priors[["space"]]
     ))
 
 ## IID spatial with geography-dependent RW
 f_iid_geog <- n ~ 
   IMD_quint + prop_minority + 
   f(wk_since_first, model = "rw2",
-    hyper = list(prec = prior.prec.tp1),
+    hyper = list(prec = priors[["time1"]]),
     replicate = geog) +
   f(w, model = "rw1",
-    hyper = list(prec = prior.prec.tp2)) +
+    hyper = list(prec = priors[["time2"]])) +
   f(la, model = "iid", 
     constr = T,
     hyper=list(
-      prec = prior.prec.sp
+      prec = priors[["space"]]
     ))
 
 ## BYM spatial
 f_bym <- n ~ 
   IMD_quint + prop_minority + 
   f(wk_since_first, model = "rw2",
-    hyper = list(prec = prior.prec.tp1)) +
+    hyper = list(prec = priors[["time1"]])) +
   f(w, model = "rw1",
-    hyper = list(prec = prior.prec.tp2)) +
+    hyper = list(prec = priors[["time2"]])) +
   f(la, model = "bym2", graph = g,
     constr = T,
     hyper=list(
       phi =list(param = c(0.5, 2/3)),
-      prec = prior.prec.sp) 
+      prec = priors[["space"]]) 
   )
 
 ## BYM spatial effect, geography-dependent RW
 f_bym_geog <- n ~ 
   IMD_quint + prop_minority + 
   f(wk_since_first, model = "rw2",
-    hyper = list(prec = prior.prec.tp1),
+    hyper = list(prec = priors[["time1"]]),
     replicate = geog) +
   f(w, model = "rw1",
-    hyper = list(prec = prior.prec.tp2)) +
+    hyper = list(prec = priors[["time2"]])) +
   f(la, model = "bym2", graph = g,
     constr = T,
     hyper=list(
       phi =list(param = c(0.5, 2/3)),
-      prec = prior.prec.sp) 
+      prec = priors[["space"]]) 
   )
 
 ## Fit all models ##
