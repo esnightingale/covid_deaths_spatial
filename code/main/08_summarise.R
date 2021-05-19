@@ -12,9 +12,14 @@ regions <- readRDS(here::here("data","LA_shp_wpops.rds")) %>%
   dplyr::filter(grepl("E", lad19cd))
 border <- sf::st_union(regions)
 
-reconstruct7 <- readRDS(here::here("output","final","reconstruct_lag7.rds"))
-reconstruct14 <- readRDS(here::here("output","final","reconstruct_lag14.rds"))
-reconstruct21 <- readRDS(here::here("output","final","reconstruct_lag21.rds"))
+plot_quants <- c(0.01,0.25,0.75,0.99)
+
+# Load observed confirmed cases
+cases <- readRDS(here::here("data","cases.rds"))[[1]]
+
+reconstruct7 <- readRDS(here::here(outdir,"reconstruct_lag7.rds"))
+reconstruct14 <- readRDS(here::here(outdir,"reconstruct_lag14.rds"))
+reconstruct21 <- readRDS(here::here(outdir,"reconstruct_lag21.rds"))
 
 # ---------------------------------------------------------------------------- #
 ## Summarise ratio of observed:predicted per LTLA and plot ##
@@ -53,20 +58,20 @@ dev.off()
 
 # pal <- viridis::viridis(3)
 # barplot(rep(1,3), col = pal)
-png(here::here(figdir,"underascertainment_space_lag7_newpal.png"), height = 1500, width = 2000, res = 300)
-regions %>% 
-  dplyr::full_join(obs_pred_la) %>%
-ggplot() +
-  # Base layer to avoid gaps with missing fill values when faceting
-  geom_sf(data = regions, aes(geometry = geometry), fill = "grey", colour = NA) +
-  geom_sf(aes(geometry = geometry, fill = obs_med, alpha = med), colour = NA) +
-  scale_fill_gradient2(low = "firebrick", mid = "yellow", high = "steelblue", midpoint = 0, trans = "log2") +
-  # scale_fill_gradient2(low = pal[1], mid = pal[3], high = pal[2], midpoint = 0, trans = "log2") + 
-  scale_alpha_continuous(trans = "log10") +
-  labs(fill = "Observed/predicted", alpha = "Total predicted") + #"1-99% quantile range"
-  annotation_scale(location = "br") +
-  map_theme() 
-dev.off()
+# png(here::here(figdir,"underascertainment_space_lag7_newpal.png"), height = 1500, width = 2000, res = 300)
+# regions %>% 
+#   dplyr::full_join(obs_pred_la) %>%
+# ggplot() +
+#   # Base layer to avoid gaps with missing fill values when faceting
+#   geom_sf(data = regions, aes(geometry = geometry), fill = "grey", colour = NA) +
+#   geom_sf(aes(geometry = geometry, fill = obs_med, alpha = med), colour = NA) +
+#   scale_fill_gradient2(low = "firebrick", mid = "yellow", high = "steelblue", midpoint = 0, trans = "log2") +
+#   # scale_fill_gradient2(low = pal[1], mid = pal[3], high = pal[2], midpoint = 0, trans = "log2") + 
+#   scale_alpha_continuous(trans = "log10") +
+#   labs(fill = "Observed/predicted", alpha = "Total predicted") + #"1-99% quantile range"
+#   annotation_scale(location = "br") +
+#   map_theme() 
+# dev.off()
 
 # ---------------------------------------------------------------------------- #
 ## Summarise observed/predicted per week and plot ##
@@ -121,6 +126,24 @@ obs_pred_time %>%
   geom_hline(yintercept = 1) +
   labs(x = "", y = "Observed/predicted cases") 
 dev.off()
+
+# March total
+reconstruct7$total$preds %>%
+  filter(week > ymd("2020-03-01") & week < ymd("2020-04-01")) %>%
+  dplyr::summarise(obs = sum(obs)) %>% pull(obs) -> obs
+
+reconstruct7$sims %>% 
+  filter(week > ymd("2020-03-01") & week < ymd("2020-04-01")) %>%
+  dplyr::group_by(sim, scale_quant) %>%
+  dplyr::summarise(pred = sum(pred_c)) %>%
+  dplyr::ungroup() %>%
+  dplyr::summarise(l1 = quantile(pred, plot_quants[1]),
+                   l2 = quantile(pred, plot_quants[2]),
+                   med = quantile(pred, 0.5),
+                   h1 = quantile(pred, plot_quants[3]),
+                   h2 = quantile(pred, plot_quants[4])) %>%
+  mutate(obs = obs) %>% 
+  dplyr::mutate(across(l1:h2, function(pred) return(obs/pred))) -> obs_pred_march
 
 # ---------------------------------------------------------------------------- #
 ## Compare one/two/three week lags by national total time series ##
