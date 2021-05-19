@@ -14,7 +14,7 @@ alldata %>%
   count() -> tot_byage
 
 # LA populations in 10-year age bands, to match shapefile
-pops.long <- readRDS(paste0(datadir,"populations/pops.long.rds")) %>%
+pops.long <- readRDS(here::here("data","pops.long.rds")) %>%
   filter(grepl("E", lad19cd)) %>%
   group_by(lad19cd, lad19nm, geography, la_pop, mean_age, med_age, age_group10) %>%
   summarise(la_age_pop = sum(la_age_pop)) %>%

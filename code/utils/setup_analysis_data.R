@@ -84,7 +84,7 @@ dat <- d_agg_wk %>%
          pop_dens = la_pop/area_km2,
          IMD_quint = cut(IMD, 5)) %>%  
   dplyr::select(n, E, E_wk, E_wk_unstrat, w, week, lad19cd, lad19nm, la_pop, geog, geography, area_km2, pop_dens,
-                first, wk_since_first, first_overall, wk_first_la_overall, med_age, IMD, IMD_quint, prop_minority, prop_kw) %>%
+                first, wk_since_first, first_overall, wk_first_la_overall, med_age, IMD, IMD_quint, prop_minority) %>%
   dplyr::mutate(w2 = w, w3 = w, SIR = n/E) 
 
 # add numeric indices for each LTLA
@@ -92,7 +92,7 @@ dat$la <- dat %>%
   dplyr::group_by(lad19cd) %>%
   dplyr::group_indices()
 
-saveRDS(dat, paste0(datadir,sprintf("/dat_%s_%s_%s.rds",measure,start,end)))
+# saveRDS(dat, here::here("data","aggregated",sprintf("/%s_%s_%s.rds",measure,start,end)))
 
 return(dat)
 

@@ -65,7 +65,7 @@ pops.long <- pops %>%
          lad19nm = Name,
          la_pop = `All ages`) %>%
   dplyr::select(lad19cd:la_pop, mean_age, everything()) %>%
-  dplyr::pivot_longer(cols = -lad19cd:-mean_age, names_to = "age", values_to = "pop") %>% # View()
+  tidyr::pivot_longer(cols = -lad19cd:-mean_age, names_to = "age", values_to = "pop") %>% # View()
   dplyr::mutate(age = as.integer(age)) %>%
   dplyr::group_by(lad19cd,lad19nm,geography, age) %>%
   dplyr::summarise(la_pop = sum(unique(la_pop)),
@@ -97,7 +97,7 @@ pops.long <-
 
 pops.wide <- pops.long %>%
   dplyr::select(-age_group10) %>% #-age_quintile
-  dplyr::pivot_wider(id_cols = c(-age_group,-la_age_pop), names_from = age_group, values_from = la_age_pop)
+  tidyr::pivot_wider(id_cols = c(-age_group,-la_age_pop), names_from = age_group, values_from = la_age_pop)
 
 # ---------------------------------------------------------------------------- #
 # Add tidied population data to shapefile
