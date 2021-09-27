@@ -11,9 +11,13 @@
 # SETUP
 ################################################################################
 
+figdir <- "figures/final model"
+measure <- "deaths"
+wave <- 1
+
 # LTLA-week-aggregated observed deaths, expected deaths and LTLA covariates
 # (first and second waves)
-dat_all <- readRDS(here::here("data","deaths.rds"))
+dat_all <- readRDS(here::here("data","aggregated","deaths.rds"))
 
 dat <- dat_all[[wave]] 
 dat$n[dat$wk_since_first < 0] <- NA
@@ -51,11 +55,161 @@ dev.off()
 # IMD quintiles
 post_fixed <- lapply(fit_final$marginals.fixed, function(x) inla.tmarginal(exp, x)) 
 lapply(post_fixed, inla.zmarginal)
+# $`(Intercept)`
+# $`(Intercept)`$mean
+# [1] 0.1392652
+# 
+# $`(Intercept)`$sd
+# [1] 0.03038953
+# 
+# $`(Intercept)`$quant0.025
+# [1] 0.08646786
+# 
+# $`(Intercept)`$quant0.25
+# [1] 0.1176555
+# 
+# $`(Intercept)`$quant0.5
+# [1] 0.1368648
+# 
+# $`(Intercept)`$quant0.75
+# [1] 0.1581909
+# 
+# $`(Intercept)`$quant0.975
+# [1] 0.2054901
+# 
+# 
+# $`IMD_quint(12.3,20]`
+# $`IMD_quint(12.3,20]`$mean
+# [1] 1.03724
+# 
+# $`IMD_quint(12.3,20]`$sd
+# [1] 0.04185252
+# 
+# $`IMD_quint(12.3,20]`$quant0.025
+# [1] 0.9573215
+# 
+# $`IMD_quint(12.3,20]`$quant0.25
+# [1] 1.008448
+# 
+# $`IMD_quint(12.3,20]`$quant0.5
+# [1] 1.036345
+# 
+# $`IMD_quint(12.3,20]`$quant0.75
+# [1] 1.064999
+# 
+# $`IMD_quint(12.3,20]`$quant0.975
+# [1] 1.121754
+# 
+# 
+# $`IMD_quint(20,27.7]`
+# $`IMD_quint(20,27.7]`$mean
+# [1] 1.172561
+# 
+# $`IMD_quint(20,27.7]`$sd
+# [1] 0.06126096
+# 
+# $`IMD_quint(20,27.7]`$quant0.025
+# [1] 1.056638
+# 
+# $`IMD_quint(20,27.7]`$quant0.25
+# [1] 1.130248
+# 
+# $`IMD_quint(20,27.7]`$quant0.5
+# [1] 1.170884
+# 
+# $`IMD_quint(20,27.7]`$quant0.75
+# [1] 1.212963
+# 
+# $`IMD_quint(20,27.7]`$quant0.975
+# [1] 1.297304
+# 
+# 
+# $`IMD_quint(27.7,35.4]`
+# $`IMD_quint(27.7,35.4]`$mean
+# [1] 1.27291
+# 
+# $`IMD_quint(27.7,35.4]`$sd
+# [1] 0.09765259
+# 
+# $`IMD_quint(27.7,35.4]`$quant0.025
+# [1] 1.091382
+# 
+# $`IMD_quint(27.7,35.4]`$quant0.25
+# [1] 1.204985
+# 
+# $`IMD_quint(27.7,35.4]`$quant0.5
+# [1] 1.269109
+# 
+# $`IMD_quint(27.7,35.4]`$quant0.75
+# [1] 1.336562
+# 
+# $`IMD_quint(27.7,35.4]`$quant0.975
+# [1] 1.474947
+# 
+# 
+# $`IMD_quint(35.4,43.1]`
+# $`IMD_quint(35.4,43.1]`$mean
+# [1] 1.210042
+# 
+# $`IMD_quint(35.4,43.1]`$sd
+# [1] 0.1304595
+# 
+# $`IMD_quint(35.4,43.1]`$quant0.025
+# [1] 0.973658
+# 
+# $`IMD_quint(35.4,43.1]`$quant0.25
+# [1] 1.118486
+# 
+# $`IMD_quint(35.4,43.1]`$quant0.5
+# [1] 1.202876
+# 
+# $`IMD_quint(35.4,43.1]`$quant0.75
+# [1] 1.293609
+# 
+# $`IMD_quint(35.4,43.1]`$quant0.975
+# [1] 1.485806
+# 
+# 
+# $prop_minority
+# $prop_minority$mean
+# [1] 2.813507
+# 
+# $prop_minority$sd
+# [1] 0.6597265
+# 
+# $prop_minority$quant0.025
+# [1] 1.736522
+# 
+# $prop_minority$quant0.25
+# [1] 2.3408
+# 
+# $prop_minority$quant0.5
+# [1] 2.737862
+# 
+# $prop_minority$quant0.75
+# [1] 3.202309
+# 
+# $prop_minority$quant0.975
+# [1] 4.316798
 
 # Prop minority (rescale to %)
 inla.zmarginal(inla.tmarginal(function(x) exp(x/100), fit_final$marginals.fixed[[6]]))
+# Mean            1.01013 
+# Stdev           0.00233979 
+# Quantile  0.025 1.00554 
+# Quantile  0.25  1.00854 
+# Quantile  0.5   1.01012 
+# Quantile  0.75  1.01171 
+# Quantile  0.975 1.01473 
 
 get_coeffs(fit_final)
+# effect                mean     sd quant0.025 quant0.25 quant0.5 quant0.75 quant0.975
+# 1 (Intercept)          0.139 0.0304     0.0865     0.118    0.137     0.158      0.205
+# 2 IMD_quint(12.3,20]   1.04  0.0419     0.957      1.01     1.04      1.06       1.12 
+# 3 IMD_quint(20,27.7]   1.17  0.0613     1.06       1.13     1.17      1.21       1.30 
+# 4 IMD_quint(27.7,35.4] 1.27  0.0977     1.09       1.20     1.27      1.34       1.47 
+# 5 IMD_quint(35.4,43.1] 1.21  0.130      0.974      1.12     1.20      1.29       1.49 
+# 6 prop_minority        2.81  0.660      1.74       2.34     2.74      3.20       4.32
 
 png(here::here(figdir,"covariates_final.png"), height = 800, width = 1000, res = 150)
 fit_final %>% 
@@ -170,6 +324,7 @@ dat_sims <-  dplyr::bind_cols(dat[,.(geography, lad19cd, lad19nm, la, la_pop, we
 dat_sims_long <- reshape2::melt(
   dat_sims, 
   id.vars = 1:9)
+setDT(dat_sims_long)
 
 dat_sims_long <- dat_sims_long[, pred := exp(value)]
 dat_sims_long <- dat_sims_long[, pred_n := exp(value)*E_wk]
@@ -221,11 +376,11 @@ agg_sims <- dat_sims_long[,.(q01 = quantile(pred_n, 0.01),
                           by = .(la, lad19cd, lad19nm, la_pop, geography, week)]
 
 calc_inc <- function(x) x*1e5/agg_sims$la_pop
-agg_sims_plot <- mutate(agg_sims, across(q05:obs, calc_inc))
+agg_sims_plot <- mutate(agg_sims, across(q01:obs, calc_inc))
 
 plot_fit_la <- function(plotdata){
   ggplot(plotdata, aes(x = week)) + 
-    geom_ribbon(aes(ymin = q01, ymax = q98), alpha = 0.2, fill = "steelblue") +
+    geom_ribbon(aes(ymin = q01, ymax = q99), alpha = 0.2, fill = "steelblue") +
     geom_ribbon(aes(ymin = q25, ymax = q75), alpha = 0.2, fill = "steelblue") +
     geom_line(aes(y = q50), col = "steelblue") +
     geom_point(aes(y = obs), cex = 0.5) + 

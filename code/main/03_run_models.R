@@ -21,7 +21,7 @@ g <- inla.read.graph(filename = here::here("data","regions_eng.adj"))
 
 # LTLA-week-aggregated observed deaths, expected deaths and LTLA covariates
 # (first and second waves)
-dat_all <- readRDS(here::here("data",paste0(measure,".rds")))
+dat_all <- readRDS(here::here("data","aggregated",paste0(measure,".rds")))
 
 dat <- dat_all[[wave]]
 period <- dat_all$breaks[[wave]]
@@ -119,13 +119,15 @@ f_bym_geog <- n ~
   )
 
 ## Fit all models ##
-formulae <- list(base = f_base, base_geog = f_base_geog, iid = f_iid, iid_geog = f_iid_geog, BYM = f_bym, BYM_geog = f_bym_geog) #, BYM_geog_nocovs = f_bym_geog_nocovs
+formulae <- list(base = f_base, base_geog = f_base_geog, 
+                 iid = f_iid, iid_geog = f_iid_geog, 
+                 BYM = f_bym, BYM_geog = f_bym_geog) #, BYM_geog_nocovs = f_bym_geog_nocovs
 fits <- lapply(formulae, fit_mod, dat, expected = expected)
 
 # Check failed cpo values
 lapply(fits, function(f) summary(f$cpo$failure))
 
-saveRDS(fits, file = here::here(outdir,sprintf("fits_%s_%s.rds",measure, wave)))
+saveRDS(fits, file = here::here("output",sprintf("fits_%s_%s.rds",measure, wave)))
 
 # Just final model
 # fit <- fit_mod(f_bym_geog, dat, expected = expected)
@@ -134,7 +136,7 @@ saveRDS(fits, file = here::here(outdir,sprintf("fits_%s_%s.rds",measure, wave)))
 
 # ## Draw posterior samples ##
 samples <- lapply(fits, inla.posterior.sample,n = nsims)
-saveRDS(samples, file =  here::here(outdir,sprintf("samples_%s_%s.rds",measure, wave)))
+saveRDS(samples, file =  here::here("output",sprintf("samples_%s_%s.rds",measure, wave)))
 
 # Just final model
 # samples <- inla.posterior.sample(fit, n = 1000)

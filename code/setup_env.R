@@ -8,9 +8,14 @@
 ################################################################################
 
 # devtools::install_github('timcdlucas/INLAutils')
- 
+# install.packages("INLA",
+#                  repos=c(getOption("repos"),
+#                          INLA="https://inla.r-inla-download.org/R/stable"), 
+#                  dep=TRUE)
+
 # Packages required
-packages <- c("tidyverse","lubridate","data.table","dtplyr","readxl","INLA","sf","spdep","rgdal","ggspatial","patchwork","scales","here")
+packages <- c("tidyverse","lubridate","data.table","dtplyr","readxl","sf",
+              "spdep","rgdal","ggspatial","patchwork","scales","here","rlist")
 
 # Check and install if necessary
 installed_packages <- packages %in% rownames(installed.packages())
@@ -22,7 +27,7 @@ if (any(installed_packages == FALSE)) {
 invisible(lapply(packages, library, character.only = TRUE))
 
 # Local data directory (for raw linelists)
-datadir <- "C:/Users/phpuenig/Documents/COVID-19/Data/"
+# datadir <- "C:/Users/phpuenig/Documents/COVID-19/Data/"
 
 # Set default theme for plotting
 theme_set(theme_minimal())
@@ -38,3 +43,7 @@ regions.df <- st_drop_geometry(regions)
 # Specify measure to fit to (cases or deaths) and wave (1 or 2)
 measure <- "deaths"
 wave <- 1
+
+# Source utility functions
+list.files(here::here("code","utils"), full.names = TRUE) %>% purrr::walk(source)
+

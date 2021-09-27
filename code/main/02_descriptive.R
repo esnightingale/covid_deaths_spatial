@@ -15,19 +15,36 @@
 figdir <- "figures/descriptive"
 
 # LTLA-week-aggregated observed deaths, expected deaths and LTLA covariates
-deaths <- readRDS(here::here("data","deaths.rds")) 
-cases <- readRDS(here::here("data","cases.rds")) 
+deaths <- readRDS(here::here("data","aggregated","deaths.rds")) 
+cases <- readRDS(here::here("data","aggregated","cases.rds")) 
 
 data.list <- list(deaths = deaths,cases = deaths)
-
-linelist_deaths <- readRDS(paste0(datadir, sprintf("linelist_%s.rds","deaths")))%>%
-  mutate(month = lubridate::month(date, label = TRUE)) 
-linelist_cases <- readRDS(paste0(datadir, sprintf("linelist_%s.rds","cases"))) %>%
-  mutate(month = lubridate::month(date, label = TRUE)) 
 
 ################################################################################
 # DESCRIPTIVE SUMMARIES/PLOTS
 ################################################################################
+
+## MAP TOTALS ##
+
+period <- cases[[3]][[1]]
+cases[[1]] %>%
+  group_by(lad19cd) %>%
+  summarise(n = sum(n, na.rm = TRUE)) %>% 
+  full_join(regions) %>%
+  basic_map(fill = "n", rate1e5 = TRUE, scale = F) -> case_map
+# labs(title = "Confirmed cases per 100,000",
+#      subtitle = paste(period[1],"-",period[2])) + 
+
+deaths[[1]] %>%
+  group_by(lad19cd) %>%
+  summarise(n = sum(n, na.rm = TRUE)) %>% 
+  full_join(regions) %>%
+  basic_map(fill = "n", rate1e5 = TRUE, scale = F) -> death_map
+# labs(title = "Deaths per 100,000") + 
+
+png(here::here(figdir,"map_totals.png"), height = 1000, width = 1500, res = 150)
+case_map + death_map
+dev.off()
 
 ## TIME SERIES - BY GEOGRAPHY ##
 
@@ -70,16 +87,16 @@ cases[[1]] %>%
   labs(subtitle = "Confirmed COVID-19 cases in England, by geography and week of specimen",
        x = "Calendar week",
        y = "Rate per 100,000") +
-  guides(col = FALSE) +
+  guides(col = "none") +
   scale_x_date(date_minor_breaks = "1 week", 
                date_breaks = "1 month",
                date_labels = "%b",
                limits = period) -> ts_geog_cases
 
+
 png(here::here(figdir,"fig1.png"), height = 1200, width = 2000, res = 150)
 (ts_geog_deaths | death_map) / (ts_geog_cases | case_map ) + plot_layout(widths = c(2,1))
 dev.off()
-
 
 # ---------------------------------------------------------------------------- #
 
@@ -94,7 +111,7 @@ dev.off()
 
 ## COVARIATES ##
 
-cov_names <- c("med_age","pop_dens", "IMD", "prop_minority", "prop_kw")
+cov_names <- c("med_age","pop_dens", "IMD", "prop_minority")
 deaths[[1]] %>%
   group_by(geography, lad19cd) %>%
   summarise_at(all_of(cov_names), .funs = base::mean) %>%
@@ -157,29 +174,6 @@ dev.off()
 
 # ---------------------------------------------------------------------------- #
 
-## MAP TOTALS ##
-
-period <- cases[[3]][[1]]
-cases[[1]] %>%
-  group_by(lad19cd) %>%
-  summarise(n = sum(n, na.rm = TRUE)) %>% 
-  full_join(regions) %>%
-  basic_map(fill = "n", rate1e5 = TRUE, scale = F) -> case_map
-  # labs(title = "Confirmed cases per 100,000",
-  #      subtitle = paste(period[1],"-",period[2])) + 
-
-deaths[[1]] %>%
-  group_by(lad19cd) %>%
-  summarise(n = sum(n, na.rm = TRUE)) %>% 
-  full_join(regions) %>%
-  basic_map(fill = "n", rate1e5 = TRUE, scale = F) -> death_map
-  # labs(title = "Deaths per 100,000") + 
-
-
-png(here::here(figdir,"map_totals.png"), height = 1000, width = 1500, res = 150)
-case_map + death_map
-dev.off()
-
 deaths[[1]] %>% 
   group_by(lad19nm) %>%
   summarise(N = sum(n, na.rm = T),
@@ -202,58 +196,5 @@ summary(case_rates$rate)
 
 hist(case_rates$rate, breaks = 40)
 
-
-# ---------------------------------------------------------------------------- #
-## Swab-death lag ##
-
-linelist_deaths %>% 
-  mutate(postP2 = (date_swab >= ymd("2020-05-18"))) %>%
-  group_by(postP2) %>%
-  summarise(mean = mean(swab_death, na.rm = T),
-            sd = sqrt(var(swab_death, na.rm = T)),
-            quants = paste0(quantile(swab_death, c(0.05,0.25,0.5,0.75,0.95), na.rm = T),collapse = "-"))
-
-summary(linelist_deaths$swab_death)
-#    Min. 1st Qu.  Median    Mean 3rd Qu.    Max.    NA's 
-# -180.00    3.00    6.00    8.24   11.00  219.00   33430 
-
-summary(linelist_deaths$swab_death[linelist_deaths$swab_death >= 0 & linelist_deaths$swab_death <= 100])
-#    Min. 1st Qu.  Median    Mean 3rd Qu.    Max.    NA's 
-#    0.00    3.00    6.00    8.22   11.00  100.00   33430 
-
-## By geography
-linelist_deaths %>% 
-  mutate(postP2 = (date_swab >= ymd("2020-05-18"))) %>%
-  filter(!is.na(postP2)) %>%
-  left_join(dplyr::select(regions.df, lad19cd, geography)) %>%
-  group_by(geography, postP2) %>%
-  summarise(mean = mean(swab_death, na.rm = T),
-            sd = sqrt(var(swab_death, na.rm = T)),
-            quants = paste0(quantile(swab_death, c(0.05,0.25,0.5,0.75,0.95), na.rm = T),collapse = "-"))
-
-png(here::here("figures","descriptive","swab_death_lag.png"), height = 800, width = 1000, res = 150)
-linelist_deaths %>% 
-  filter(swab_death >= 0 & date_swab >= ymd("2020-05-18")) %>%
-  ggplot(aes(x = swab_death)) + 
-  geom_histogram(bins = 40, fill = "steelblue") +
-  labs(x = "Days from swab to death", y = "Density") + 
-  xlim(c(0,100))
-dev.off()
-
-png(here::here("figures","descriptive","swab_death_lag_bypillar.png"), height = 800, width = 1000, res = 150)
-linelist_deaths %>% 
-  filter(swab_death >= 0 & date_swab >= ymd("2020-05-18") & pillars %in% c("pillar1", "pillar2")) %>%
-  ggplot(aes(x = swab_death)) + 
-  geom_histogram(bins = 40, fill = "steelblue") +
-  facet_wrap(~pillars) +
-  labs(x = "Days from swab to death", y = "Density") + 
-  xlim(c(0,100))
-dev.off()
-
-linelist_deaths %>%
-  group_by(pillars) %>%
-  summarise(mean = mean(swab_death, na.rm = T),
-            sd = sqrt(var(swab_death, na.rm = T)),
-            quants = paste0(quantile(swab_death, c(0.05,0.25,0.5,0.75,0.95), na.rm = T),collapse = "-"))
-
-# ---------------------------------------------------------------------------- #
+################################################################################
+################################################################################

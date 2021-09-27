@@ -11,9 +11,13 @@
 # SETUP
 ################################################################################
 
+figdir <- "figures/model comparison"
+measure <- "deaths"
+wave <- 1
+
 # LTLA-week-aggregated observed deaths, expected deaths and LTLA covariates
 # (first and second waves)
-dat_all <- readRDS(here::here("data","deaths.rds"))
+dat_all <- readRDS(here::here("data","aggregated","deaths.rds"))
 
 dat <- dat_all[[wave]] 
 dat$n[dat$wk_since_first < 0] <- NA
@@ -28,8 +32,8 @@ weekrange <- seq(min(dat$w), max(dat$w))
 weekseq <- seq(min(dat$week), max(dat$week), by = "week")
 
 # Fitted models and posterior samples
-fits <- readRDS(file = here::here(outdir,sprintf("fits_%s_%s.rds","deaths", wave)))
-samples <- readRDS(file = here::here(outdir,sprintf("samples_%s_%s.rds","deaths", wave)))
+fits <- readRDS(file = here::here("output",sprintf("fits_%s_%s.rds","deaths", wave)))
+samples <- readRDS(file = here::here("output",sprintf("samples_%s_%s.rds","deaths", wave)))
 nsims <- length(samples[[1]])
 
 # ---------------------------------------------------------------------------- #
@@ -47,7 +51,7 @@ dev.off()
 table <- model_comp(fits)
 table
 
-write.csv(table, here::here(outdir,paste0("model_comp.csv")), row.names = F)
+write.csv(table, here::here("output",paste0("model_comp.csv")), row.names = F)
 
 # ---------------------------------------------------------------------------- #
 # FIXED EFFECTS
@@ -55,7 +59,7 @@ write.csv(table, here::here(outdir,paste0("model_comp.csv")), row.names = F)
 coeffs <- lapply(fits, get_coeffs)
 coeffs
 
-saveRDS(coeffs, here::here(outdir,paste0("model_coeffs.rds")))
+saveRDS(coeffs, here::here("output",paste0("model_coeffs.rds")))
         
 # ---------------------------------------------------------------------------- #
 # MAP MODEL MSE
@@ -154,7 +158,7 @@ for (s in seq_along(samples)){
   
   preds <- bind_cols(lapply(samples[[s]], get_preds, dat))
   
-  pdf(here::here("figures",measure,paste0("summ_post_", names(fits)[s],".pdf")), height = 8, width = 10)
+  pdf(here::here("figures","posterior summaries",paste0("summ_post_", names(fits)[s],".pdf")), height = 8, width = 10)
   
   dat_pred <- bind_cols(dplyr::select(dat, geography, lad19cd, lad19nm, la, la_pop, week, E_wk, n), 
                         preds) %>%
