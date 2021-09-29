@@ -15,7 +15,10 @@ library(data.table)
 library(tidyverse)
 library(dtplyr)
 
-dat <- readRDS(here::here("data","deaths.rds"))
+outdir <- "output/predict"
+figdir <- "figures/predict"
+
+dat <- readRDS(here::here("data","aggregated","deaths.rds"))
 dat <- dat[["first"]] 
 
 pred_avgcov <- readRDS(here::here(outdir,"fit_samples_avgcov.rds"))
@@ -24,13 +27,13 @@ samples_pred <- pred_avgcov$samples
 dat_pred <- pred_avgcov$dat
 
 sims <- as.data.table(dplyr::bind_cols(lapply(samples_pred, get_preds, dat_pred)))
-# saveRDS(sims, file = here::here(outdir,"sims_avgcov.rds"))
+saveRDS(sims, file = here::here(outdir,"sims_avgcov.rds"))
 
 # Predictions at average covariates
-sims <- readRDS(file = here::here(outdir,"sims_avgcov.rds"))
+# sims <- readRDS(file = here::here(outdir,"sims_avgcov.rds"))
 data.table::setDT(sims)
 
-cases <- readRDS(here::here("data","cases.rds"))[[1]] %>%
+cases <- readRDS(here::here("data","aggregated","cases.rds"))[[1]] %>%
   dplyr::rename(cases = n) %>%
   dplyr::select(week, lad19nm, cases)
 
@@ -48,21 +51,21 @@ sims$lad19nm <- dat$lad19nm
 sims$geography <- dat$geography
 sims$E_wk <- dat$E_wk_unstrat
 sims$n <- dat$n
-sims_long <- reshape2::melt(sims, id.vars = nsims+1:5)
+sims_long <- setDT(reshape2::melt(sims, id.vars = nsims+1:5))
 
 sims_long <- sims_long[, pred := exp(value)]
 sims_long <- sims_long[, pred_n := exp(value)*E_wk]
 
-saveRDS(sims_long, file = here::here("output","sims_long_avgcov.rds"))
+saveRDS(sims_long, file = here::here(outdir,"sims_long_avgcov.rds"))
 
-agg_sims <- sims_long[,.(q05 = quantile(pred_n, 0.05),
+agg_sims <- sims_long[,.(q01 = quantile(pred_n, 0.01),
                              q25 = quantile(pred_n, 0.25),
                              q50 = quantile(pred_n, 0.5),
                              q75 = quantile(pred_n, 0.75),
-                             q95 = quantile(pred_n, 0.95)),
+                             q99 = quantile(pred_n, 0.99)),
                           by = .(lad19nm, geography, week)]
 
-write.csv(agg_sims, file = here::here("output","pred_quants_avgcov.csv"), row.names = F)
+write.csv(agg_sims, file = here::here(outdir,"pred_quants_avgcov.csv"), row.names = F)
 
 
 ################################################################################
@@ -98,7 +101,7 @@ agg_sims$n <- dat$n
 png(here::here(figdir,"pred_avgcov_lasamp.png"), height = 1000, width = 1200, res = 150)
 ggplot(as.data.frame(agg_sims[lad19nm %in% la_samp]),
        aes(week, q50)) +
-  geom_ribbon(aes(ymin = q05, ymax = q95), alpha = 0.2, fill = "steelblue") +
+  geom_ribbon(aes(ymin = q01, ymax = q99), alpha = 0.2, fill = "steelblue") +
   geom_ribbon(aes(ymin = q25, ymax = q75), alpha = 0.2, fill = "steelblue") +
   geom_line(col = "steelblue") +
   geom_point(aes(y = n)) +

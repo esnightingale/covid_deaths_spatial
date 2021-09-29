@@ -18,7 +18,7 @@ g <- inla.read.graph(filename = here::here("data","regions_eng.adj"))
 
 # LTLA-week-aggregated observed deaths, expected deaths and LTLA covariates
 # (first and second waves)
-dat_all <- readRDS(here::here("data",paste0(measure,".rds")))
+dat_all <- readRDS(here::here("data","aggregated",paste0(measure,".rds")))
 
 dat <- dat_all[[wave]] 
 dat$n[dat$wk_since_first < 0] <- NA
@@ -28,10 +28,10 @@ period <- dat_all$breaks[[wave]]
 nsims <- 1000
 
 # Fitted models and posterior samples
-fits <- readRDS(file = here::here(outdir,
+fits <- readRDS(file = here::here("output",
                                   sprintf("fits_%s_%s.rds",measure, wave)))
 fit_final <- fits[[6]]
-samples <- readRDS(file = here::here(outdir,
+samples <- readRDS(file = here::here("output",
                                      sprintf("samples_%s_%s.rds",measure, wave)))
 samples_final <- samples[[6]]
 
@@ -95,7 +95,7 @@ summary(fit_pred)
 # Samples are of *marginal* densities
 samples_pred <- inla.posterior.sample(n = nsims, fit_pred)
 
-saveRDS(list(fit = fit_pred, samples = samples_pred, dat = dat_pred), file = here::here(outdir,"fit_samples_avgcov.rds"))
+saveRDS(list(fit = fit_pred, samples = samples_pred, dat = dat_pred), file = here::here("output","predict","fit_samples_avgcov.rds"))
 
 
 ######################################
@@ -134,5 +134,5 @@ summary(fit_nocov)
 # Samples are of *marginal* densities
 samples_nocov <- inla.posterior.sample(n = nsims, fit_nocov)
 
-saveRDS(list(fit = fit_nocov, samples = samples_nocov, dat = dat), file = here::here(outdir,"fit_samples_nocov.rds"))
+saveRDS(list(fit = fit_nocov, samples = samples_nocov, dat = dat), file = here::here("output","predict","fit_samples_nocov.rds"))
 

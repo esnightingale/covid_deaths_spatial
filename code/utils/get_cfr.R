@@ -1,5 +1,10 @@
 get_cfr <- function(sims, cases, lag, plot = F){
   
+  gc()
+  sink(file = here::here(outdir,paste0("calcCFR_lag",lag,".txt")))
+  
+  nsims <- dplyr::n_distinct(sims$variable)
+  
   # Join posterior predictions of deaths (averaging out covariates) with observed cases
   # Inner join to keep only overlapping weeks after lagging
   # Estimate CFR per week/per LTLA as cases/predicted deaths
@@ -102,7 +107,11 @@ get_cfr <- function(sims, cases, lag, plot = F){
     print(time)
     dev.off()
   }
+ 
+  out <- list(ratio = ratio, lag = lag, nsims = nsims)
+  saveRDS(out, here::here("output","reconstruct",paste0("cfr_lag",lag,".rds")))
 
-  return(list(ratio = ratio, lag = lag))
-  
+  sink()
 }
+
+

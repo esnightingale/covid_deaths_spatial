@@ -12,8 +12,6 @@
 ################################################################################
 
 figdir <- "figures/final model"
-measure <- "deaths"
-wave <- 1
 
 # LTLA-week-aggregated observed deaths, expected deaths and LTLA covariates
 # (first and second waves)
@@ -276,7 +274,7 @@ dev.off()
 
 ## Highest IID effects
 sp_re %>%
-  filter(name == "IID") %>%
+  filter(name == "Unstructured") %>%
   slice_max(order_by = abs(value), n = 9) %>%
   pull(lad19cd) %>%
   unique() -> hi_IID
@@ -303,7 +301,7 @@ dev.off()
 
 ## Lowest IID effects
 sp_re %>%
-  filter(name == "IID") %>%
+  filter(name == "Unstructured") %>%
   slice_min(order_by = abs(value), n = 9) %>%
   pull(lad19cd) %>%
   unique() -> low_IID

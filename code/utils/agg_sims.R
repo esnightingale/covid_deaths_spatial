@@ -1,5 +1,7 @@
 agg_sims <- function(rescaled, type = c("la","geog","total")){
   
+  gc()
+  
   if (type == "la") {
     rescaled <- group_by(rescaled, lad19nm, week) %>%
       rename(obs = n_c)

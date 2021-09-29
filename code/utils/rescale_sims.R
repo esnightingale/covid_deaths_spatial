@@ -1,5 +1,7 @@
 rescale_sims <- function(cfr_out, scale_quants = c(0.25, 0.75)){ 
 
+  gc()
+  
   # Average over weekly CFRs where cases and deaths > 0
   cfr_out$ratio %>%
     filter(period == 2) %>%
@@ -20,7 +22,9 @@ rescale_sims <- function(cfr_out, scale_quants = c(0.25, 0.75)){
     dplyr::mutate(sim = row_number(),
                   lag = paste(cfr_out$lag/7,"weeks")) %>% 
     dplyr::ungroup() -> rescaled
-
+ 
+  saveRDS(rescaled, here::here("output","reconstruct",paste0("rescaled_lag",lag,".rds")))
+  
   return(rescaled)
   
 }

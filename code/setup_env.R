@@ -14,7 +14,7 @@
 #                  dep=TRUE)
 
 # Packages required
-packages <- c("tidyverse","lubridate","data.table","dtplyr","readxl","sf",
+packages <- c("tidyverse","lubridate","data.table","dtplyr","readxl","sf","INLA",
               "spdep","rgdal","ggspatial","patchwork","scales","here","rlist")
 
 # Check and install if necessary

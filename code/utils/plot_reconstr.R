@@ -1,5 +1,5 @@
 plot_reconst <- function(agg_sims, lag, sample = NA, order = T, title = T, caption = T,
-                         save = T, figdir = "figures", suffix = "", h = 1400, w = 2000, res = 300, format = "png"){
+                         save = T, figdir = "figures/reconstruct", suffix = "", h = 1400, w = 2000, res = 300, format = "png"){
   
   plot.data <- agg_sims$preds
   
