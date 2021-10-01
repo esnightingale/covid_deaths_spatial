@@ -1,6 +1,7 @@
 agg_sims <- function(rescaled, type = c("la","geog","total")){
   
   gc()
+  nsims <- n_distinct(rescaled$sim)
   
   if (type == "la") {
     rescaled <- group_by(rescaled, lad19nm, week) %>%
@@ -31,6 +32,6 @@ agg_sims <- function(rescaled, type = c("la","geog","total")){
                      lag = unique(lag)) %>%
     dplyr::ungroup() 
   
-  return(list(preds = preds, type = type))
+  return(list(preds = preds, type = type, nsims = nsims))
   
 }

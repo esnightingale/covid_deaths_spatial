@@ -17,7 +17,6 @@ reconstruct <- function(cases, lag,
   }
   
   cfr_out <- readRDS(file.cfr)
-  nsims <- cfr_out$nsims
   
   rescaled <- rescale_sims(cfr_out, scale_quants) 
   
@@ -30,7 +29,7 @@ reconstruct <- function(cases, lag,
   if (plot == TRUE){
     plot_reconst(agg_total, lag, suffix = suffix)
     plot_reconst(agg_geog, lag, suffix = suffix)
-    plot_reconst(agg_la, lag, h = 50, w = 50, format = "pdf", suffix = "wtd")
+    plot_reconst(agg_la, lag, h = 50, w = 50, format = "pdf", suffix = suffix)
   }
   
   return(list(total = agg_total, geog = agg_geog, la = agg_la, sims = rescaled, lag = lag))

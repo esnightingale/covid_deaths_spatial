@@ -24,6 +24,9 @@ cases <- readRDS(here::here("data","aggregated","cases.rds"))[[1]]
 
 # Sample of LAs to check reconstruction
 la_samp <- sample(unique(cases$lad19nm),9)
+la_samp
+# [1] "Knowsley"           "Winchester"         "Copeland"           "Southwark"          "Lewes"              "Bromsgrove"         "Forest of Dean"    
+# [8] "Broxbourne"         "North Warwickshire"
 
 # ---------------------------------------------------------------------------- #
 ## Reconstruct cases from predicted deaths ##
@@ -50,7 +53,8 @@ for (lag in c(7,14,21)){
 # ---------------------------------------------------------------------------- #
 ## Plot for lag 7 ##
 
-# plot_reconst(reconstruct$la, 7, sample = la_samp, save = T, figdir = figdir, h = 10, w = 12)
+reconstruct <- readRDS(here::here(outdir, "reconstruct_lag7.rds"))
+plot_reconst(reconstruct$la, 7, sample = la_samp, save = T, figdir = figdir, h = 10, w = 12)
 # plot_reconst(reconstruct$total, 7, save = T, figdir = figdir, title = F, caption = F)
 # plot_reconst(reconstruct$geog, 7, save = T, figdir = figdir, title = F, caption = F)
 

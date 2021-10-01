@@ -7,6 +7,9 @@
 ################################################################################
 ################################################################################
 
+outdir <- "output/reconstruct"
+figdir <- "figures/reconstruct"
+
 ## Shapefiles
 regions <- readRDS(here::here("data","LA_shp_wpops.rds")) %>%
   dplyr::filter(grepl("E", lad19cd))
@@ -15,11 +18,13 @@ border <- sf::st_union(regions)
 plot_quants <- c(0.01,0.25,0.75,0.99)
 
 # Load observed confirmed cases
-cases <- readRDS(here::here("data","cases.rds"))[[1]]
+cases <- readRDS(here::here("data","aggregated","cases.rds"))[[1]]
 
 reconstruct7 <- readRDS(here::here(outdir,"reconstruct_lag7.rds"))
 reconstruct14 <- readRDS(here::here(outdir,"reconstruct_lag14.rds"))
 reconstruct21 <- readRDS(here::here(outdir,"reconstruct_lag21.rds"))
+
+sink(here::here(outdir, "summary_log.txt"))
 
 # ---------------------------------------------------------------------------- #
 ## Summarise ratio of observed:predicted per LTLA and plot ##
@@ -38,10 +43,12 @@ reconstruct7$sims %>%
   dplyr::mutate(obs_med = obs/med,
                 iqr = uq-lq) -> obs_pred_la
 
+print("Summary observed over predicted median, by LTLA:")
 summary(obs_pred_la$obs_med)
 # Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
 # 0.2630  0.5960  0.9201  1.0722  1.3349  3.8052  
 
+print("Summary predicted IQR, by LTLA:")
 summary(obs_pred_la$iqr)
 # Min.  1st Qu.   Median     Mean  3rd Qu.     Max. 
 # 2.913   82.461  169.170  285.194  356.515 4492.398 
@@ -97,6 +104,7 @@ reconstruct7$sims %>%
   dplyr::mutate(obs = obs) %>%
   dplyr::mutate(across(l1:h2, function(pred) return(obs/pred))) -> obs_pred_time 
 
+print("Summary observed versus predicted over time:")
 summary(obs_pred_time)
 
 # Plot relative differences in national total per week 
@@ -144,6 +152,9 @@ reconstruct7$sims %>%
                    h2 = quantile(pred, plot_quants[4])) %>%
   mutate(obs = obs) %>% 
   dplyr::mutate(across(l1:h2, function(pred) return(obs/pred))) -> obs_pred_march
+
+print("Observed versus predicted, March 2020:")
+as.data.frame(obs_pred_march)
 
 # ---------------------------------------------------------------------------- #
 ## Compare one/two/three week lags by national total time series ##
@@ -240,4 +251,5 @@ write.csv(tab2, here::here(outdir,"table2.csv"), row.names = FALSE)
 write.csv(tabS2, here::here(outdir,"tableS2.csv"), row.names = FALSE)
 
 ################################################################################
+sink()
 ################################################################################
