@@ -41,6 +41,7 @@ reconstruct7$sims %>%
                    obs = median(obs)) %>% 
   dplyr::ungroup() %>%
   dplyr::mutate(obs_med = obs/med,
+                percentage = obs_med*100,
                 iqr = uq-lq) -> obs_pred_la
 
 print("Summary observed over predicted median, by LTLA:")
@@ -117,7 +118,7 @@ obs_pred_time %>%
   geom_ribbon(aes(ymin = l2, ymax = h2), alpha = 0.2, fill = "steelblue") +
   geom_line(aes(y = med), col = "steelblue") +
   scale_x_date(breaks = "month", date_labels = "%b") +
-  scale_y_continuous(trans = "log2", 
+  scale_y_continuous(trans = "log2",
                      labels = scales::number_format(accuracy = 0.01)) +
   geom_vline(xintercept = ymd("2020-04-15"), col = "red") +
   annotate("text", x = ymd("2020-05-19"), y = 0.3, 
