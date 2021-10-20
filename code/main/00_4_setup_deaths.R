@@ -9,7 +9,7 @@
 ## Load/tidy linelist
 
 # READ ONS LINELIST
-path_to_factory <- "~/COVID-19/covid19_automation"
+path_to_factory <- "C:/Users/emily/Documents/COVID-19/covid19_automation"
 file_path <- file.path(path_to_factory, "data", "rds", "deaths_eng_latest.rds")
 key <- cyphr::data_key(file.path(path_to_factory, "data"))
 covid_deaths_raw <- cyphr::decrypt(readRDS(file_path), key)
