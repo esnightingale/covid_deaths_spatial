@@ -44,8 +44,8 @@ png(here::here(figdir,"reconstruct7_vs_infections.png"), height = 1500, width = 
 reconstruct7$total$preds %>%
   inner_join(infect_prev) %>%
   ggplot(aes(week, estimate_n)) +
-  geom_ribbon(aes(ymin = lo_n, ymax = hi_n), alpha = 0.2, fill = "indianred") +
-  geom_line(col = "indianred") +
+  geom_errorbar(aes(ymin = lo_n, ymax = hi_n), col = "indianred", width = 0.5) +
+  geom_point(col = "indianred") +
   geom_ribbon(aes(y = med, ymin = l1, ymax = h2), alpha = 0.2, fill = "steelblue") +
   geom_line(aes(y = med), col = "steelblue") +
   labs(x = "", y = "Incidence", 
@@ -71,13 +71,13 @@ p_detect %>%
                    hi = quantile(value, plot_quants[4])) %>% 
   ungroup() -> p_detect_time
 
-png(here::here(figdir,"perc_detect_time.png"), height = 1500, width = 2000, res = 300)
-p_detect_time %>%
-  ggplot(aes(week, med)) +
-  geom_ribbon(aes(ymin = lo, ymax = hi), alpha = 0.2, fill = "steelblue") +
-  geom_line(col = "steelblue") +
-  labs(x = "", y = "% infections detected under Pillars 1 + 2")
-dev.off()
+# png(here::here(figdir,"perc_detect_time.png"), height = 1500, width = 2000, res = 300)
+# p_detect_time %>%
+#   ggplot(aes(week, med)) +
+#   geom_ribbon(aes(ymin = lo, ymax = hi), alpha = 0.2, fill = "steelblue") +
+#   geom_line(col = "steelblue") +
+#   labs(x = "", y = "% infections detected under Pillars 1 + 2")
+# dev.off()
 
 # Overall
 reconstruct7$sims %>%
@@ -103,7 +103,7 @@ round(p_detect_all,2)
 
 reconstruct7$total$preds %>%
   inner_join(dplyr::select(infect_prev, week, estimate_n, lo_n, hi_n)) %>% 
-  filter(week > ymd("2020-05-18")) %>% 
+  filter(week > ymd("2020-05-18")) %>%
   summarise(across(c(obs,estimate_n:hi_n), sum)) %>% 
   mutate(med = obs*100/estimate_n,
          hi = obs*100/lo_n,
@@ -140,35 +140,68 @@ pred_time %>%
          across(l1:h2, function(x) x*100/p_detect_all$hi,.names = "{.col}_phi"),
          across(l1_est:h2_est, function(x) return(obs*100/x), .names = "{.col}_percdet")) -> pred_infect_time
 
-png(here::here(figdir,"reconstruct7_vs_infections_wbounds.png"), height = 1500, width = 2000, res = 300)
+pred_time %>%
+  dplyr::select(-obs) %>%
+  mutate(across(l1:h2, function(x) x*100/p_detect_all$med),
+         variable = "Total infections") -> plot_infects
+
+pred_time %>%
+  dplyr::select(-obs) %>%
+  mutate(variable = "Post-P2 detectable infections") -> plot_cases
+
+pred_time %>%
+  dplyr::select(week,obs) %>%
+  mutate(variable = "Observed cases",
+         coverage = factor(
+           case_when(week < ymd("2020-05-17") ~ "Pre-P2 expansion",
+                     week >= ymd("2020-05-18") ~ "Post-P2 expansion"),
+           levels = c("Pre-P2 expansion","Post-P2 expansion"))) -> plot_obs
+
 infect_prev %>%
-  right_join(pred_infect_time) %>%
-  ggplot(aes(week)) +
-  # Infections - lower bound % detected
-  geom_ribbon(data = pred_infect_time,
-              aes(ymin = l1_plo, ymax = h2_plo), alpha = 0.1, fill = "grey") +
-  geom_line(data = pred_infect_time,
-            aes(y = med_plo), col = "lightgrey") +
-  # Infections - upper bound % detected
-  geom_ribbon(data = pred_infect_time,
-              aes(ymin = l1_phi, ymax = h2_phi), alpha = 0.1, fill = "grey") +
-  geom_line(data = pred_infect_time,
-            aes(y = med_phi), col = "lightgrey") +
-  # Infections - estimate % detected
-  geom_ribbon(aes(ymin = l1_est, ymax = h2_est), alpha = 0.3, fill = "grey") +
-  geom_ribbon(aes(ymin = l2_est, ymax = h1_est), alpha = 0.3, fill = "grey") +
-    geom_line(aes(y = med_est), col = "grey") +
+  dplyr::select(week, lo_n, estimate_n, hi_n) %>%
+  mutate(variable = "ONS Infection survey estimate") %>%
+  bind_rows(plot_infects) %>%
+  bind_rows(plot_cases) %>%
+  bind_rows(plot_obs) -> plot_allvars
+ 
+pal <- c("Total infections" = "grey",
+         "Post-P2 detectable infections" = "steelblue",
+         "Observed cases" = "black",
+         "ONS Infection survey estimate" = "indianred")
+
+png(here::here(figdir,"reconstruct7_vs_infections_new.png"), height = 1500, width = 2400, res = 300)
+ggplot(plot_allvars, aes(week, med, ymin = l1, ymax = h2)) +
+  # Reconstructed cases and infections
+  geom_ribbon(aes(fill = variable), alpha = 0.3) +
+  geom_ribbon(aes(fill = variable, ymin = l2, ymax = h1), alpha = 0.3) +
+  geom_line(aes(col = variable)) +
   # ONS-estimated weekly incidence of test-positive infection
-  geom_ribbon(aes(ymin = lo_n, ymax = hi_n), alpha = 0.2, fill = "indianred") +
-  geom_line(aes(y = estimate_n), col = "indianred") +
-  # Reconstructed cases detected under P1+2
-  geom_ribbon(aes(y = med, ymin = l1, ymax = h2), alpha = 0.2, fill = "steelblue") +
-  geom_ribbon(aes(y = med, ymin = l2, ymax = h1), alpha = 0.2, fill = "steelblue") +
-  geom_line(aes(y = med), col = "steelblue") +
-  geom_point(aes(y = obs)) +
+  geom_errorbar(aes(ymin = lo_n, ymax = hi_n, col = variable), width = 1) +
+  geom_point(aes(y = estimate_n, col = variable)) +
+  # Observed cases (by surveillance period)
+  geom_point(aes(y = obs, col = variable, pch = coverage)) +
+  # Key time points
+  geom_vline(xintercept = ymd("2020-03-13"), col = "grey30", lty = "dashed") +
+  geom_vline(xintercept = ymd("2020-04-15"), col = "grey30", lty = "dashed") +
+  geom_vline(xintercept = ymd("2020-05-18"), col = "grey30", lty = "dashed") +
+  annotate("text", x = ymd("2020-05-19"), y = 28e4, 
+           label = "P2 available to all symptomatic cases", col = "grey30",
+           cex = 2, hjust = "left") +
+  annotate("text", x = ymd("2020-04-16"), y = 26e4, 
+           label = "P2 available to care home residents and staff", col = "grey30",
+           cex = 2, hjust = "left") +
+  annotate("text", x = ymd("2020-03-14"), y = 24e4, 
+           label = "Testing pivoted from community to hospital need", col = "grey30",
+           cex = 2, hjust = "left") +
+  # Formatting
   scale_y_continuous(labels = scales::number_format(accuracy = 1000)) +
-  labs(x = "", y = "Incidence", 
-       caption = "Reconstructed pillar 1+2 cases in blue; Infections according to weekly ONS-estimated rates in red.\nGrey curve indicates potential infections under assumption of 25% detection under pillar 1+2 surveillance.")
+  scale_colour_manual(values = pal) +
+  scale_fill_manual(values = pal) +
+  scale_shape_manual(values = c(1,19), na.translate = FALSE) +
+  theme(legend.position = c(0.2,0.7)) +
+  labs(x = "", y = "Incidence", col = "", fill = "", shape = ""
+       #, caption = "Reconstructed pillar 1+2 cases in blue; Infections according to weekly ONS-estimated rates in red.\nGrey curve indicates potential infections under assumption of 25% detection under pillar 1+2 surveillance."
+       )
 dev.off()
 
 pred_time %>%
@@ -188,22 +221,22 @@ pred_infect_time %>%
   scale_x_date(breaks = "month", date_labels = "%b") +
   # scale_y_continuous(trans = "log2",
   #                    labels = scales::number_format(accuracy = 0.01)) +
-  geom_vline(xintercept = ymd("2020-03-13"), col = "red") +
-  geom_vline(xintercept = ymd("2020-04-15"), col = "red") +
-  geom_vline(xintercept = ymd("2020-05-18"), col = "red") +
-  annotate("text", x = ymd("2020-05-19"), y = 15, 
+  geom_vline(xintercept = ymd("2020-03-13"), col = "grey30", lty = "dashed") +
+  geom_vline(xintercept = ymd("2020-04-15"), col = "grey30", lty = "dashed") +
+  geom_vline(xintercept = ymd("2020-05-18"), col = "grey30", lty = "dashed") +
+  annotate("text", x = ymd("2020-05-19"), y = 15, col = "grey30",
            label = "P2 available to all symptomatic cases", 
            cex = 2, hjust = "left") +
-  annotate("text", x = ymd("2020-04-16"), y = 10, 
+  annotate("text", x = ymd("2020-04-16"), y = 10, col = "grey30",
            label = "P2 available to care home residents and staff", 
            cex = 2, hjust = "left") +
-  annotate("text", x = ymd("2020-03-14"), y = 5, 
+  annotate("text", x = ymd("2020-03-14"), y = 5, col = "grey30",
            label = "Testing pivoted from community to hospital need", 
            cex = 2, hjust = "left") +
   # geom_hline(yintercept = 1) +
   labs(x = "", y = "% infections detected") -> perc_detect_time #% total infections detected
 
-png(here::here(figdir,"perc_detect_time.png"), height = 1200, width = 2000, res = 300)
+png(here::here(figdir,"perc_detect_time_new.png"), height = 1200, width = 2000, res = 300)
 perc_detect_time
 dev.off()
 
@@ -281,11 +314,16 @@ dplyr::select(pred_march, l1_obspred:h2_obspred)
 # ---------------------------------------------------------------------------- #
 ## Summarise percentage detected per LTLA ##
 
+covs <- readRDS(here::here("data","covs.rds"))
+
 reconstruct7$la$preds %>%
   # dplyr::filter(week < ymd("2020-05-18")) %>%
   dplyr::group_by(lad19nm) %>%
   dplyr::summarise(obs = sum(obs, na.rm = T)) %>%
-  ungroup() -> obs_la
+  ungroup() %>%
+  dplyr::full_join(dplyr::select(regions.df, rgn19nm, geography, lad19nm, la_pop, med_age)) %>%
+  dplyr::mutate(obs_inc = obs*1e4/la_pop) %>%
+  dplyr::left_join(covs) -> obs_la
 
 # Sum predicted over LTLAs, then summarise over posteriors/quantiles
 reconstruct7$sims %>%
@@ -314,15 +352,87 @@ summary(pred_infect_la$med_est_percdet)
 # Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
 # 6.651  15.252  23.359  27.266  33.943  96.592 
 
-png(here::here(figdir,"perc_detect_space_hist_lag7.png"), height = 1500, width = 2000, res = 300)
 pred_infect_la %>%
   ggplot() +
-  geom_histogram(aes(x = med_est_percdet),alpha = 1) +
+  geom_histogram(aes(x = med_est_percdet, fill = geography), 
+                 stat = "bin",alpha = 1, position = "stack") +
   # geom_histogram(aes(x = l1_est_percdet),alpha = 0.2) +
   # geom_histogram(aes(x = h2_est_percdet),alpha = 0.2) +
   labs(x = "% infections detected",
-       y = "Frequency")
+       y = "Frequency",
+       fill = "") +
+  guides(fill = "none") +
+  facet_wrap(~geography, scales = "free_y") -> detect_hist
+
+png(here::here(figdir,"perc_detect_space_hist_lag7.png"), height = 1500, width = 2000, res = 300)
+detect_hist
 dev.off()
+
+png(here::here(figdir,"perc_detect_la_inc_byrgn_lag7.png"), height = 2000, width = 3000, res = 300)
+pred_infect_la %>%
+  ggplot(aes(y = med_est_percdet, x= obs_inc, col = rgn19nm, fill = rgn19nm)) +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  labs(y = "% infections detected",
+       x = "Observed incidence per 10,000",
+       col = "") +
+  guides(fill = "none",
+         col = "none") +
+  facet_wrap(~rgn19nm)
+dev.off()
+
+png(here::here(figdir,"perc_detect_la_inc_bygeog_lag7.png"), height = 2000, width = 3000, res = 300)
+pred_infect_la %>%
+  ggplot(aes(y = med_est_percdet, x= obs_inc, col = geography, fill = geography)) +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  labs(y = "% infections detected",
+       x = "Observed incidence per 10,000",
+       col = "") +
+  guides(fill = "none",
+         col = "none") +
+  facet_wrap(~geography)
+dev.off()
+
+png(here::here(figdir,"perc_detect_la_imd_bygeog_lag7.png"), height = 2000, width = 3000, res = 300)
+pred_infect_la %>%
+  ggplot(aes(y = med_est_percdet, x= IMD, col = geography, fill = geography)) +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  labs(y = "% infections detected",
+       x = "Index of multiple deprivation",
+       col = "") +
+  guides(fill = "none",
+         col = "none") +
+  facet_wrap(~geography)
+dev.off()
+
+png(here::here(figdir,"perc_detect_la_min_bygeog_lag7.png"), height = 2000, width = 3000, res = 300)
+pred_infect_la %>%
+  ggplot(aes(y = med_est_percdet, x= prop_minority, col = geography, fill = geography)) +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  labs(y = "% infections detected",
+       x = "% minority ethnic population",
+       col = "") +
+  guides(fill = "none",
+         col = "none") +
+  facet_wrap(~geography)
+dev.off()
+
+png(here::here(figdir,"perc_detect_la_age_bygeog_lag7.png"), height = 2000, width = 3000, res = 300)
+pred_infect_la %>%
+  ggplot(aes(y = med_est_percdet, x= med_age, col = geography, fill = geography)) +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  labs(y = "% infections detected",
+       x = "Median age",
+       col = "") +
+  guides(fill = "none",
+         col = "none") +
+  facet_wrap(~geography)
+dev.off()
+
 
 # Map out percentage infections detected in cumulative totals per LTLA
 regions %>% 
@@ -340,6 +450,34 @@ png(here::here(figdir,"perc_detect_time_space_lag7.png"), height = 1200, width =
 perc_detect_space + perc_detect_time + 
   plot_layout(widths = c(1,1.5), heights = c(1,0.8))
 dev.off()
+
+library(grid)
+library(gridExtra)
+png(here::here(figdir,"detect_space_hist_time_layout.png"), height = 2200, width = 2400, res = 300)
+gridExtra::grid.arrange(arrangeGrob(perc_detect_space,  left = textGrob("A",
+                                                                              x = unit(0.3,"npc"),
+                                                                              y = unit(0.9, "npc"),
+                                                                              gp=gpar(fontsize=16))),
+                        arrangeGrob(detect_hist, left = textGrob("B",
+                                                                       x = unit(0.3,"npc"),
+                                                                       y = unit(0.9, "npc"),
+                                                                       gp=gpar(fontsize=16))), 
+                        arrangeGrob(perc_detect_time, left = textGrob("C",
+                                                                            x = unit(0.3,"npc"),
+                                                                            y = unit(0.9, "npc"),
+                                                                            gp=gpar(fontsize=16))),
+                        layout_matrix = rbind(c(1,1,2,2,2),c(3,3,3,3,3)))
+dev.off()
+
+
+# layout <- "
+# AB
+# CC
+# "
+# (perc_detect_space + detect_hist) / perc_detect_time + 
+#   plot_annotation(tag_levels = "A") +
+#   plot_layout(design = layout)
+  
 
 # ---------------------------------------------------------------------------- #
 # Plot over time for sample with highest and lowest % detected
@@ -389,23 +527,28 @@ lagcomp <- dplyr::bind_rows(reconstruct7$total$preds,
 
 cases %>%
   group_by(week) %>%
-  summarise(obs = sum(n)) -> obs_wk
+  summarise(obs = sum(n),
+            coverage = factor(
+              case_when(week < ymd("2020-05-18") ~ "Pre-P2 expansion",
+                        week >= ymd("2020-05-18") ~ "Post-P2 expansion"),
+              levels = c("Pre-P2 expansion","Post-P2 expansion"))) -> obs_wk
 
 png(here::here(figdir,"compare_lags.png"), height = 1400, width = 2200, res = 300)
 ggplot(lagcomp, aes(week)) + 
   geom_ribbon(aes(ymin = l1, ymax = h1, fill = Lag), alpha = 0.2) +
   geom_ribbon(aes(ymin = l2, ymax = h2, fill = Lag), alpha = 0.2) +
   geom_line(aes(y = med, colour = Lag)) +
-  geom_point(data = obs_wk, aes(y = obs)) +
+  geom_point(data = obs_wk, aes(y = obs, pch = coverage)) +
   scale_fill_viridis_d(begin = 0.2, end = 0.8) +
   scale_colour_viridis_d(begin = 0.2, end = 0.8) +
   scale_x_date(breaks = "month", date_labels = "%b") +
-  labs(x = "",y = "" 
+  scale_shape_manual(values = c(1,19), na.translate = FALSE) +
+  labs(x = "",y = "Incidence", shape = "" 
        #, title = "Reconstruction of confirmed cases from COVID-19-related deaths across England",
        # subtitle = "Comparison of assumed lags between case confirmation and death"
   ) +
   theme_minimal() +
-  theme(legend.position = c(0.8,0.8))
+  theme(legend.position = c(0.8,0.7))
 dev.off()
 
 # ---------------------------------------------------------------------------- #
