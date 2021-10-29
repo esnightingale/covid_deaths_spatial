@@ -1,7 +1,12 @@
 plot_reconst <- function(agg_sims, lag, sample = NULL, order = T, title = T, caption = T,
                          save = T, figdir = "figures/reconstruct", suffix = "", h = 1400, w = 2400, res = 300, format = "png"){
   
-  plot.data <- agg_sims$preds
+  plot.data <- agg_sims$preds %>%
+    mutate(coverage = factor(
+      case_when(week < ymd("2020-05-17") ~ "Pre-P2 expansion",
+                week >= ymd("2020-05-18") ~ "Post-P2 expansion"),
+      levels = c("Pre-P2 expansion","Post-P2 expansion")))
+  
   nsims <- agg_sims$nsims
   
   if (agg_sims$type == "la"){
@@ -33,15 +38,22 @@ plot_reconst <- function(agg_sims, lag, sample = NULL, order = T, title = T, cap
     geom_ribbon(aes(ymin = l1, ymax = h1), alpha = 0.2, fill = "steelblue") +
     geom_ribbon(aes(ymin = l2, ymax = h2), alpha = 0.2, fill = "steelblue") +
     geom_line(aes(y = med), col = "steelblue") +
-    geom_point(aes(y = obs)) +
-    labs(x = "",y = "Confirmed case count") +
-    theme_minimal()
+    geom_point(aes(y = obs, pch = coverage)) +
+    scale_shape_manual(values = c(1,19), na.translate = FALSE) +
+    labs(x = "",y = "Incidence", shape = "") +
+    theme_minimal() 
   
   if (agg_sims$type != "total"){
     p <- p + 
-      facet_wrap(~facet, scales = "free") 
+      facet_wrap(~facet, scales = "free") +
+      guides(shape = "none")
   }
-
+  
+  if (agg_sims$type == "total"){
+    p <- p + 
+      theme(legend.position = c(0.2,0.8))
+  }
+  
   if (title == T){
     p <- p + 
       labs(title = "Reconstruction of confirmed cases from COVID-19-related deaths")

@@ -21,6 +21,7 @@ plot_quants <- c(0.01,0.25,0.75,0.99)
 
 # Load observed confirmed cases
 cases <- readRDS(here::here("data","aggregated","cases.rds"))[[1]]
+deaths <- readRDS(here::here("data","aggregated","deaths.rds"))[[1]]
 
 # Sample of LAs to check reconstruction
 la_samp <- sample(unique(cases$lad19nm),9)
@@ -55,8 +56,17 @@ for (lag in c(7,14,21)){
 
 reconstruct <- readRDS(here::here(outdir, "reconstruct_lag7.rds"))
 plot_reconst(reconstruct$la, 7, sample = la_samp, save = T, figdir = figdir, h = 10, w = 12)
-# plot_reconst(reconstruct$total, 7, save = T, figdir = figdir, title = F, caption = F)
-# plot_reconst(reconstruct$geog, 7, save = T, figdir = figdir, title = F, caption = F)
+plot_reconst(reconstruct$total, 7, save = T, figdir = figdir, title = F, caption = F) 
+plot_reconst(reconstruct$geog, 7, save = T, figdir = figdir, title = F, caption = F)
+
+# Combine for figure 3
+plot_reconst(reconstruct$total, 7, save = F, figdir = figdir, title = F, caption = F) -> tot
+plot_reconst(reconstruct$geog, 7, save = F, figdir = figdir, title = F, caption = F) -> geog
+geog <- geog + labs(y = "") + guides(shape = "none")
+
+png(here::here(figdir,"fig3.png"), height = 1200, width = 3200, res = 300)
+tot + geog
+dev.off()
 
 ###############################################################################
 ###############################################################################
