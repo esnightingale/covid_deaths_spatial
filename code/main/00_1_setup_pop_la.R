@@ -28,6 +28,11 @@ join_city <- function(d){
 regions_raw <- rgdal::readOGR(dsn = here::here("data","raw","Local_Authority_Districts_(April_2019)_Boundaries_UK_BFC-shp"),
                               layer = "Local_Authority_Districts_(April_2019)_Boundaries_UK_BFC-shp")
 
+# Region lookup
+
+nhsregion <- read_csv(here::here("data","raw","Local_Authority_District_to_Region__December_2019__Lookup_in_England.csv")) %>%
+  dplyr::select(-FID)
+
 # ---------------------------------------------------------------------------- #
 # Raw population data
 
@@ -103,8 +108,9 @@ pops.wide <- pops.long %>%
 # Add tidied population data to shapefile
 
 regions <- st_as_sf(regions_raw) %>%
+  dplyr::full_join(nhsregion) %>%
   dplyr::rename_all(tolower) %>%
-  dplyr::filter(!grepl("N",lad19cd) & !grepl("S",lad19cd)) %>%  # remove NI and Scotland
+  dplyr::filter(grepl("E",lad19cd)) %>%  # remove NI, Wales and Scotland
   dplyr::mutate_if(is.factor, as.character) # make factors into character to edit levels for aggregation
 
 # Aggregate Aylsbury Vale, Chiltern, South Bucks and Wycombe into Buckinghamshire unitary authority (created April 2020)
@@ -120,7 +126,7 @@ regions$lad19nm[regions$lad19nm == "Isles of Scilly"] <- "Cornwall"
 regions$lad19cd[regions$lad19nm == "Cornwall"] <- "E06000052"
 
 regions <- regions %>%
-  dplyr::group_by(lad19cd, lad19nm) %>%
+  dplyr::group_by(rgn19cd, rgn19nm, lad19cd, lad19nm) %>%
   dplyr::summarise() %>%
   dplyr::ungroup()
 
