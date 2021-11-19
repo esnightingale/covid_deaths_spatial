@@ -15,7 +15,8 @@
 
 # Packages required
 packages <- c("tidyverse","lubridate","data.table","dtplyr","readxl","sf","INLA",
-              "spdep","rgdal","ggspatial","patchwork","scales","here","rlist")
+              "spdep","rgdal","ggspatial","patchwork","scales","here","rlist",
+              "cowplot", "grid","gridExtra")
 
 # Check and install if necessary
 installed_packages <- packages %in% rownames(installed.packages())

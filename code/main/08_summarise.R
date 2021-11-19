@@ -49,7 +49,7 @@ reconstruct7$total$preds %>%
   geom_ribbon(aes(y = med, ymin = l1, ymax = h2), alpha = 0.2, fill = "steelblue") +
   geom_line(aes(y = med), col = "steelblue") +
   labs(x = "", y = "Incidence", 
-       caption = "Reconstructed P1+P2 cases in blue, estimated infections in red.")
+       caption = "Predicted P1+P2 cases in blue, estimated infections in red.")
 dev.off()
 
 # Sum predicted over LTLAs, join with estimated infection incidence and calculate
@@ -80,26 +80,26 @@ p_detect %>%
 # dev.off()
 
 # Overall
-reconstruct7$sims %>%
-  group_by(week, sim, scale_quant) %>%
-  summarise(pred = sum(pred_c)) %>%
-  inner_join(dplyr::select(infect_prev, week, estimate_n, lo_n, hi_n)) %>%
-  filter(week > ymd("2020-05-18")) %>%
-  group_by(sim, scale_quant) %>%
-  summarise(across(pred:hi_n, sum)) %>% 
-  mutate(p = pred*100/estimate_n,
-         p_lo = pred*100/lo_n,
-         p_hi = pred*100/hi_n) %>%
-  pivot_longer(p:p_hi) %>%
-  ungroup() %>%
-  summarise(lo = quantile(value, plot_quants[1]),
-            med = quantile(value, 0.5),
-            hi = quantile(value, plot_quants[4])) %>%
-  as.data.frame() -> p_detect_all
-
-round(p_detect_all,2)
-#   lo   med    hi
-# 9.91 24.17 71.36
+# reconstruct7$sims %>%
+#   group_by(week, sim, scale_quant) %>%
+#   summarise(pred = sum(pred_c)) %>%
+#   inner_join(dplyr::select(infect_prev, week, estimate_n, lo_n, hi_n)) %>%
+#   filter(week > ymd("2020-05-18")) %>%
+#   group_by(sim, scale_quant) %>%
+#   summarise(across(pred:hi_n, sum)) %>% 
+#   mutate(p = pred*100/estimate_n,
+#          p_lo = pred*100/lo_n,
+#          p_hi = pred*100/hi_n) %>%
+#   pivot_longer(p:p_hi) %>%
+#   ungroup() %>%
+#   summarise(lo = quantile(value, plot_quants[1]),
+#             med = quantile(value, 0.5),
+#             hi = quantile(value, plot_quants[4])) %>%
+#   as.data.frame() -> p_detect_all
+# 
+# round(p_detect_all,2)
+# #   lo   med    hi
+# # 9.91 24.17 71.36
 
 reconstruct7$total$preds %>%
   inner_join(dplyr::select(infect_prev, week, estimate_n, lo_n, hi_n)) %>% 
@@ -147,7 +147,7 @@ pred_time %>%
 
 pred_time %>%
   dplyr::select(-obs) %>%
-  mutate(variable = "Post-P2 detectable infections") -> plot_cases
+  mutate(variable = "Predicted-P1+P2 cases") -> plot_cases
 
 pred_time %>%
   dplyr::select(week,obs) %>%
@@ -165,7 +165,7 @@ infect_prev %>%
   bind_rows(plot_obs) -> plot_allvars
  
 pal <- c("Total infections" = "grey",
-         "Post-P2 detectable infections" = "steelblue",
+         "Predicted-P1+P2" = "steelblue",
          "Observed cases" = "black",
          "ONS Infection survey estimate" = "indianred")
 
@@ -311,6 +311,26 @@ dplyr::select(pred_march, l1_obspred:h2_obspred)
 # l1_obspred l2_obspred med_obspred h1_obspred h2_obspred
 # 55.1       51.6        42.5       34.5       32.4
 
+# Overall total
+sum(reconstruct7$total$preds$obs, na.rm = T) -> obs_tot
+
+# Sum predicted over LTLAs, then summarise over posteriors/quantiles
+reconstruct7$sims %>%
+  # dplyr::filter(week < ymd("2020-05-18")) %>%
+  dplyr::group_by(sim, scale_quant) %>%
+  dplyr::summarise(pred = sum(pred_c)) %>%
+  dplyr::ungroup() %>%
+  dplyr::summarise(l1 = quantile(pred, plot_quants[1]),
+                   l2 = quantile(pred, plot_quants[2]),
+                   med = quantile(pred, 0.5),
+                   h1 = quantile(pred, plot_quants[3]),
+                   h2 = quantile(pred, plot_quants[4])) -> pred_tot
+
+pred_tot %>%
+  mutate(across(l1:h2, function(x) x*100/p_detect_all$med, .names = "{.col}_est"),
+         across(l1_est:h2_est, function(x) return(obs_tot*100/x), .names = "{.col}_percdet")) -> pred_infect_tot
+
+
 # ---------------------------------------------------------------------------- #
 ## Summarise percentage detected per LTLA ##
 
@@ -345,12 +365,70 @@ pred_la %>%
          across(l1:h2, function(x) x*100/p_detect_all$hi,.names = "{.col}_phi"),
          across(l1_est:h2_est, function(x) return(obs*100/x), .names = "{.col}_percdet")) -> pred_infect_la
 
-summary(pred_infect_la$med_est_percdet)
-# Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
-# 5.964  13.675  20.944  24.447  30.434  86.606 
+pred_infect_la %>%
+  summarise(low = quantile(med_est_percdet, 0.01),
+            med = median(med_est_percdet),
+            high = quantile(med_est_percdet,0.99))
+#  low   med  high
+# 7.84  23.4  85.2
 
-# Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
-# 6.651  15.252  23.359  27.266  33.943  96.592 
+pred_infect_la %>%
+  group_by(geography) %>%
+  summarise(low = quantile(med_est_percdet, 0.01),
+            med = median(med_est_percdet),
+            high = quantile(med_est_percdet,0.99)) -> tab_geog
+tab_geog
+# geography                   low   med  high
+# London Borough            11.0   19.3  43.4
+# Metropolitan District      7.20  18.8  68.9
+# Non-metropolitan District  8.40  26.2  93.1
+# Unitary Authority          8.43  22.5  60.4
+
+pred_infect_la %>%
+  group_by(rgn19nm) %>%
+  summarise(low = quantile(med_est_percdet, 0.01),
+            med = median(med_est_percdet),
+            high = quantile(med_est_percdet,0.99)) -> tab_rgn
+tab_rgn
+# rgn19nm                    low   med  high
+# East Midlands             7.33  12.8  41.4
+# East of England           9.90  29.0  67.5
+# London                   11.0   19.3  43.4
+# North East               15.6   29.6  73.1
+# North West                8.24  17.4  74.6
+# South East                9.10  28.7  75.9
+# South West               10.1   38.9  96.5
+# West Midlands            10.6   20.8  47.8
+# Yorkshire and The Humber  7.29  16.2  44.6
+
+
+pred_infect_la$rgn19nm[pred_infect_la$rgn19nm == "Yorkshire and The Humber"] <- "Yorkshire and\nThe Humber"
+ggplot(pred_infect_la, aes(x = rgn19nm, y = med_est_percdet, 
+                           ymin = l1_est_percdet,
+                           ymax = h2_est_percdet,
+                           col = rgn19nm,
+                           fill = rgn19nm)) +
+  geom_jitter() +
+  geom_boxplot(alpha = 0.3, outlier.shape = NA) +
+  guides(col = "none", fill = "none") +
+  labs(x = "", y = "% infections detected") +
+  ylim(c(0,100)) -> perc_detect_region
+png(here::here(figdir,"perc_detect_region.png"), height = 1500, width = 2500, res = 300)
+perc_detect_region
+dev.off()
+
+png(here::here(figdir,"perc_detect_geog.png"), height = 1500, width = 2000, res = 300)
+ggplot(pred_infect_la, aes(x = geography, y = med_est_percdet, 
+                           ymin = l1_est_percdet,
+                           ymax = h2_est_percdet,
+                           col = geography,
+                           fill = geography)) +
+  geom_jitter() +
+  geom_boxplot(alpha = 0.3, outlier.shape = NA) +
+  guides(col = "none", fill = "none") +
+  labs(x = "", y = "% infections detected") +
+  ylim(c(0,100))
+dev.off()
 
 pred_infect_la %>%
   ggplot() +
@@ -368,30 +446,34 @@ png(here::here(figdir,"perc_detect_space_hist_lag7.png"), height = 1500, width =
 detect_hist
 dev.off()
 
-png(here::here(figdir,"perc_detect_la_inc_byrgn_lag7.png"), height = 2000, width = 3000, res = 300)
 pred_infect_la %>%
   ggplot(aes(y = med_est_percdet, x= obs_inc, col = rgn19nm, fill = rgn19nm)) +
-  geom_point() +
-  geom_smooth(method = "lm") +
+  geom_point(size = 0.5) +
+  geom_smooth(method = "lm", lwd = 0.5, alpha = 0.2) +
   labs(y = "% infections detected",
        x = "Observed incidence per 10,000",
        col = "") +
   guides(fill = "none",
          col = "none") +
-  facet_wrap(~rgn19nm)
+  # scale_colour_manual(pal) +
+  # scale_fill_manual(pal) +
+  facet_wrap(~rgn19nm) -> perc_detect_inc_rgn
+png(here::here(figdir,"perc_detect_la_inc_byrgn_lag7.png"), height = 2000, width = 3000, res = 300)
+perc_detect_inc_rgn
 dev.off()
 
-png(here::here(figdir,"perc_detect_la_inc_bygeog_lag7.png"), height = 2000, width = 3000, res = 300)
 pred_infect_la %>%
   ggplot(aes(y = med_est_percdet, x= obs_inc, col = geography, fill = geography)) +
-  geom_point() +
+  geom_point(size = 0.8) +
   geom_smooth(method = "lm") +
   labs(y = "% infections detected",
        x = "Observed incidence per 10,000",
        col = "") +
   guides(fill = "none",
          col = "none") +
-  facet_wrap(~geography)
+  facet_wrap(~geography) -> perc_detect_inc_geog
+png(here::here(figdir,"perc_detect_la_inc_bygeog_lag7.png"), height = 2000, width = 3000, res = 300)
+perc_detect_inc_geog
 dev.off()
 
 png(here::here(figdir,"perc_detect_la_imd_bygeog_lag7.png"), height = 2000, width = 3000, res = 300)
@@ -437,33 +519,27 @@ dev.off()
 # Map out percentage infections detected in cumulative totals per LTLA
 regions %>% 
   dplyr::full_join(pred_infect_la) %>%
-  basic_map(fill = "med_est_percdet", plot.border = T) +
-  # scale_fill_gradient2(midpoint = 0, trans = "log2") +
-  labs(fill = "% infections\ndetected") +
-  theme(legend.position = c(0.2, 0.5)) -> perc_detect_space
+  inset_map(fill = "med_est_percdet", fill.lab = "% infections\ndetected", 
+            plot.border = F, scale = F) -> perc_detect_space
 
 png(here::here(figdir,"perc_detect_space_lag7.png"), height = 1500, width = 2000, res = 300)
 perc_detect_space
 dev.off()
 
-png(here::here(figdir,"perc_detect_time_space_lag7.png"), height = 1200, width = 2000, res = 300)
-perc_detect_space + perc_detect_time + 
-  plot_layout(widths = c(1,1.5), heights = c(1,0.8))
-dev.off()
 
 library(grid)
 library(gridExtra)
-png(here::here(figdir,"detect_space_hist_time_layout.png"), height = 2200, width = 2400, res = 300)
+png(here::here(figdir,"detect_space_rgn_time_layout.png"), height = 2600, width = 3000, res = 320)
 gridExtra::grid.arrange(arrangeGrob(perc_detect_space,  left = textGrob("A",
-                                                                              x = unit(0.3,"npc"),
+                                                                              x = unit(0.5,"npc"),
                                                                               y = unit(0.9, "npc"),
                                                                               gp=gpar(fontsize=16))),
-                        arrangeGrob(detect_hist, left = textGrob("B",
-                                                                       x = unit(0.3,"npc"),
+                        arrangeGrob(perc_detect_inc_rgn, left = textGrob("B",
+                                                                       x = unit(0.5,"npc"),
                                                                        y = unit(0.9, "npc"),
                                                                        gp=gpar(fontsize=16))), 
                         arrangeGrob(perc_detect_time, left = textGrob("C",
-                                                                            x = unit(0.3,"npc"),
+                                                                            x = unit(0.5,"npc"),
                                                                             y = unit(0.9, "npc"),
                                                                             gp=gpar(fontsize=16))),
                         layout_matrix = rbind(c(1,1,2,2,2),c(3,3,3,3,3)))
@@ -493,6 +569,9 @@ sample <- sample(regions.df$lad19nm, 9)
   
 # Predictions per week and per ltla
 reconstruct7$la$preds %>%
+  dplyr::mutate(period = factor(case_when(week < ymd("2020-05-18") ~ "Pre-pillar 2 expansion",
+                                          week >= ymd("2020-05-18") ~ "Post-pillar 2 expansion"),
+                                levels = c("Pre-pillar 2 expansion","Post-pillar 2 expansion"))) %>%
   full_join(dplyr::select(regions.df, lad19nm, la_pop)) %>%
   left_join(infect_prev) %>%
   mutate(across(estimate:hi, function(x) (x/100)*la_pop, .names = "{.col}_n"),
@@ -501,7 +580,8 @@ reconstruct7$la$preds %>%
          # across(l1:h2, function(x) x*100/p_detect_all$hi,.names = "{.col}_phi"),
          across(l1_est:h2_est, function(x) return(obs*100/x), .names = "{.col}_propdet")) -> pred_infect
 
-png(here::here(figdir,"reconstruct7_vs_infections_lasamp.png"), height = 2000, width = 2400, res = 300)
+png(here::here(figdir,"reconstruct7_vs_infections_lasamp.png"), height = 2000, width = 2600, res = 300)
+# pdf(here::here(figdir,"reconstruct7_la_all.pdf"), height = 60, width = 60)
 pred_infect %>%
   filter(lad19nm %in% sample) %>%
   ggplot(aes(week)) +
@@ -510,10 +590,13 @@ pred_infect %>%
   # Reconstructed cases detected under P1+2
   geom_ribbon(aes(y = med, ymin = l1, ymax = h2), alpha = 0.2, fill = "steelblue") +
   geom_line(aes(y = med), col = "steelblue") +
-  geom_point(aes(y = obs)) +
+  geom_point(aes(y = obs, shape = period)) +
   # scale_y_continuous(trans = "log10") +
-  labs(x = "", y = "Incidence", 
-       caption = "Reconstructed P1+2 cases in blue. Grey curve indicates infection trajectory under the\nassumption of 25% detection overall under P1+2.") +
+  scale_shape_manual(values = c(1,19), na.translate = FALSE) +
+  # theme(legend.position = c(0.1,0.9)) +
+  labs(x = "", y = "Incidence", shape = "" ,
+       # caption = "Reconstructed P1+2 cases in blue. Grey curve indicates infection trajectory under the\nassumption of 25% detection overall under P1+2."
+       ) +
   facet_wrap(~lad19nm, scales = "free_y")
 dev.off()
 

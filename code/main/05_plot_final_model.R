@@ -30,9 +30,9 @@ weekrange <- seq(min(dat$w), max(dat$w))
 weekseq <- seq(min(dat$week), max(dat$week), by = "week")
 
 # Fitted models and posterior samples
-fit_final <- readRDS(file = here::here("output",
+fit_final <- readRDS(file = here::here("output","fit",
                                   sprintf("fits_%s_%s.rds","deaths", wave)))[[6]]
-samples_final <- readRDS(file = here::here("output",
+samples_final <- readRDS(file = here::here("output","fit",
                                      sprintf("samples_%s_%s.rds","deaths", wave)))[[6]]
 
 nsims <- length(samples_final)
