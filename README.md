@@ -1,6 +1,6 @@
-# Reconstructing the symptomatic-case epidemic from COVID-19-related deaths in England
+# Estimating the local burden of disease during the first wave of the COVID-19 epidemic in England, using different data sources from changing surveillance practices
 
-This repository contains the code used to produce estimated trajectories of detectable, symptomatic cases of COVID-19 during the first epidemic wave in England, based on reported COVID-19-related deaths per week and per lower tier local authority (LTLA). This is acheived by estimating a confirmed-case-fatality ratio according to cases detected under the expanded pillar 1 + pillar 2 testing system in place from 18th May 2020, and applying this to rescale smoothed trajectories of deaths from January to June, accounting for case-fatality risk factors of the local population. 
+This repository contains the code used to predict the potential trajectories of symptomatic cases and total infections for COVID-19 during the first epidemic wave in England, based on reported COVID-19-related deaths per week and per lower tier local authority (LTLA). This is acheived by estimating a confirmed-case-fatality ratio according to cases detected under the expanded pillar 1 + pillar 2 testing system in place from 18th May 2020, and applying this to rescale smoothed trajectories of deaths from January to June, accounting for case-fatality risk factors of the local population. Data from serological surveys are then used to infer the total number of infections represented by these cases.
 
 The full analysis pipeline can be run with *main/run_all.R* and consists of the following steps:
 
