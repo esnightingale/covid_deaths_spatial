@@ -44,6 +44,12 @@ deaths <- rlist::list.append(deaths, breaks = waves)
 
 saveRDS(deaths, here::here("data","aggregated","deaths.rds"))
 
+# range(alldata_sub$date) 
+# "2020-01-05" "2020-06-30"
+
+# summary(as.factor(alldata_sub$death_type2))
+# Lab confirmed Not lab confirmed
+#         39332             13228
 
 ################################################################################
 ################################################################################
