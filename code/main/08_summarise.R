@@ -13,6 +13,7 @@ figdir <- "figures/reconstruct"
 ## Shapefiles
 regions <- readRDS(here::here("data","LA_shp_wpops.rds")) %>%
   dplyr::filter(grepl("E", lad19cd))
+regions.df <- sf::st_drop_geometry(regions)
 border <- sf::st_union(regions)
 
 # Total population
@@ -263,6 +264,103 @@ dplyr::select(pred_march, l1_obspred:h2_obspred)
 # 55.1       51.6        42.5       34.5       32.4
 
 # ---------------------------------------------------------------------------- #
+# Total estimated infections by geography/region
+
+reconstruct7$geog$preds %>%
+  dplyr::group_by(geography) %>%
+  dplyr::summarise(obs = sum(obs)) %>% pull(obs) -> obs_geog
+
+reconstruct7$sims %>% 
+  dplyr::group_by(geography, sim, scale_quant) %>%
+  dplyr::summarise(pred = sum(pred_c)) %>%
+  dplyr::group_by(geography) %>%
+  dplyr::summarise(l1 = quantile(pred, plot_quants[1]),
+                   l2 = quantile(pred, plot_quants[2]),
+                   med = quantile(pred, 0.5),
+                   h1 = quantile(pred, plot_quants[3]),
+                   h2 = quantile(pred, plot_quants[4])) %>%
+  ungroup() %>%
+  mutate(obs = obs_geog) %>% 
+  dplyr::mutate(across(l1:h2, function(x) obs*100/x, .names = "{.col}_obspred"),
+                across(l1:h2, function(x) x*100/p_detect_all$med, .names = "{.col}_est"),
+                across(l1_est:h2_est, function(x) return(obs*100/x), .names = "{.col}_percdet")) -> pred_geog
+
+print("Estimated total infections by geography:")
+dplyr::select(pred_geog, l1_est:h2_est)
+
+reconstruct7$la$preds %>%
+  dplyr::left_join(dplyr::select(regions, lad19nm, rgn19nm)) %>%
+  dplyr::group_by(rgn19nm) %>%
+  dplyr::summarise(obs = sum(obs)) %>% pull(obs) -> obs_rgn
+
+reconstruct7$sims %>%
+  dplyr::left_join(dplyr::select(regions, lad19nm, rgn19nm)) %>%
+  dplyr::group_by(rgn19nm, sim, scale_quant) %>%
+  dplyr::summarise(pred = sum(pred_c)) %>%
+  dplyr::group_by(rgn19nm) %>%
+  dplyr::summarise(l1 = quantile(pred, plot_quants[1]),
+                   l2 = quantile(pred, plot_quants[2]),
+                   med = quantile(pred, 0.5),
+                   h1 = quantile(pred, plot_quants[3]),
+                   h2 = quantile(pred, plot_quants[4])) %>%
+  ungroup() %>%
+  mutate(obs = obs_rgn) %>%
+  dplyr::mutate(across(l1:h2, function(x) obs*100/x, .names = "{.col}_obspred"),
+                across(l1:h2, function(x) x*100/p_detect_all$med, .names = "{.col}_est"),
+                across(l1_est:h2_est, function(x) return(obs*100/x), .names = "{.col}_percdet")) -> pred_rgn
+
+print("Estimated infections by region:")
+dplyr::select(pred_rgn, rgn19nm, l1_est:h2_est)
+# rgn19nm                   l1_est  l2_est med_est  h1_est  h2_est
+# 1 East Midlands            131958. 139341. 176864. 252968. 271843.
+# 2 East of England           88180.  93577. 116037. 141894. 151430.
+# 3 London                   122976. 141735. 172478. 202789. 233570.
+# 4 North East                36572.  39109.  48207.  60228.  64796.
+# 5 North West               212280. 229268. 258741. 294696. 315380.
+# 6 South East               106817. 113125. 138331. 175212. 184415.
+# 7 South West                27010.  28917.  47713.  61298.  65821.
+# 8 West Midlands            104508. 110805. 129636. 148193. 156690.
+# 9 Yorkshire and The Humber 184770. 199236. 235422. 301367. 335078.
+
+print("% infections detected, by region:")
+dplyr::select(pred_rgn, rgn19nm, l1_est_percdet:h2_est_percdet)
+# rgn19nm                  l1_est_percdet l2_est_percdet med_est_percdet h1_est_percdet h2_est_percdet
+# 1 East Midlands                      15.2           14.4            11.3           7.93           7.38
+# 2 East of England                    26.1           24.6            19.9          16.3           15.2 
+# 3 London                             27.2           23.6            19.4          16.5           14.3 
+# 4 North East                         41.0           38.3            31.1          24.9           23.1 
+# 5 North West                         19.6           18.1            16.1          14.1           13.2 
+# 6 South East                         31.1           29.4            24.0          19.0           18.0 
+# 7 South West                         46.7           43.7            26.5          20.6           19.2 
+# 8 West Midlands                      23.8           22.4            19.2          16.8           15.9 
+# 9 Yorkshire and The Humber           15.1           14.0            11.9           9.28           8.35
+
+
+# Commbine into supplementary table S4
+
+format_tab <- function(tab){
+  
+  tab %>%
+    dplyr::mutate(across(l1_est:h2_est, round),
+                  across(l1_est_percdet:h2_est_percdet, round, digits = 1)) %>%
+    dplyr::mutate(infect_CI98 = paste0(med_est, " [",l1_est," - ", h2_est,"]"),
+                  infect_CI50 = paste0(med_est, " [",l2_est, " - ", h1_est,"]"),
+                  pdet_CI98 = paste0(med_est_percdet," [",h2_est_percdet, " - ", l1_est_percdet,"]"),
+                  pdet_CI50 = paste0(med_est_percdet, " [",h1_est_percdet, " - ", l2_est_percdet,"]")) %>%
+    dplyr::select(obs, med_est, infect_CI98, infect_CI50, med_est_percdet, pdet_CI98, pdet_CI50) %>%
+    return()
+    
+}
+
+tabs <- list(pred_tot, pred_geog, pred_rgn)
+tabS4 <- bind_rows(lapply(tabs, format_tab))
+
+tabS4$Region <- c("England",pred_geog$geography, pred_rgn$rgn19nm)
+tabS4 <- dplyr::select(tabS4, Region, everything())
+
+write.csv(tabS4, here::here(outdir, "TableS4.csv"), row.names = F)
+
+# ---------------------------------------------------------------------------- #
 # Compare P1 and P1+2
 
 reconstruct7$total$preds %>%
@@ -362,6 +460,14 @@ tab_rgn
 # South West               10.1   38.9  96.5
 # West Midlands            10.6   20.8  47.8
 # Yorkshire and The Humber  7.29  16.2  44.6
+
+# Absolute total infections by region
+pred_infect_la %>%
+  group_by(rgn19nm) %>%
+  summarise(low = quantile(med_est, 0.01),
+            med = median(med_est),
+            high = quantile(med_est,0.99)) -> tab_rgn_abs
+tab_rgn_abs
 
 
 pred_infect_la$rgn19nm[pred_infect_la$rgn19nm == "Yorkshire and The Humber"] <- "Yorkshire and\nThe Humber"

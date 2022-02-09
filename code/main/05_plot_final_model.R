@@ -385,17 +385,19 @@ plot_fit_la <- function(plotdata){
     facet_wrap(~lad19nm, scales = "free") +
     labs(x = "Calendar week", 
          y = "Rate per 100,000", 
-         title = "Model fit over time, by calendar week", 
-         subtitle = paste0("Observed rates shown in black, with 50-98% quantiles over ", nsims, " posterior samples")) %>%
+         # title = "Model fit over time, by calendar week", 
+         # subtitle = paste0("Observed rates shown in black, with 50-98% quantiles over ", nsims, " posterior samples")
+         ) %>%
     return()
 }
 
 la_samp <- sample(unique(dat$lad19nm),9)
+la_samp <- c("Allerdale","Cornwall","Liverpool","Newcastle-under-Lyme","North Somerset","Rother","Southwark","Three Rivers","Watford")
 png(here::here(figdir,"fit_lasamp.png"), height = 1000, width = 1500, res = 200)
 plot_fit_la(as.data.frame(agg_sims[lad19nm %in% la_samp]))
 dev.off()
 
-pdf(here::here(figdir,"fit_all_ltlas.pdf"), height = 25, width = 25)
+pdf(here::here(figdir,"fit_all_ltlas.pdf"), height = 30, width = 30)
 plot_fit_la(as.data.frame(agg_sims))
 dev.off()
 
