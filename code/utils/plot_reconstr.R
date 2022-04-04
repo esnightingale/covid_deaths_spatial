@@ -40,7 +40,9 @@ plot_reconst <- function(agg_sims, lag, sample = NULL, order = T, title = T, cap
     geom_line(aes(y = med), col = "steelblue") +
     geom_point(aes(y = obs, pch = coverage)) +
     scale_shape_manual(values = c(1,19), na.translate = FALSE) +
-    labs(x = "",y = "Incidence", shape = "") +
+    labs(x = "Calendar week", 
+         y = "Rate per 100,000", 
+         shape = "") +
     theme_minimal() 
   
   if (agg_sims$type != "total"){
