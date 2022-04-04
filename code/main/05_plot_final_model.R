@@ -359,7 +359,8 @@ ggplot(as.data.frame(dat_plot_geog)) +
   theme(legend.position = c(0.2,0.7))  -> plot_fit_time_geog
 
 png(here::here(figdir,"fit_total_geog.png"), height = 1800, width = 2400, res = 300)
-plot_fit_time / plot_fit_time_geog
+# tiff(here::here("figures","paper","fig2.tif"), height = 1800, width = 2400, res = 300)
+plot_fit_time / plot_fit_time_geog + plot_annotation(tag_levels = "A")
 dev.off()
 
 
