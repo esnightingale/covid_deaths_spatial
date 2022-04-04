@@ -127,6 +127,7 @@ pal <- c("Total infections" = "grey",
          "ONS Infection survey estimate" = "indianred")
 
 png(here::here(figdir,"figure5.png"), height = 1500, width = 2400, res = 300)
+tiff(here::here("figures","paper","fig5.tif"), height = 1500, width = 2400, res = 300)
 ggplot(plot_allvars, aes(week, med, ymin = l1, ymax = h2)) +
   # Reconstructed cases and infections
   geom_ribbon(aes(fill = variable), alpha = 0.3) +
@@ -587,7 +588,7 @@ dev.off()
 
 # Map out percentage infections detected in cumulative totals per LTLA
 regions %>% 
-  dplyr::full_join(pred_infect_la) %>%
+  dplyr::full_join(dplyr::select(pred_infect_la, lad19nm, med_est_percdet)) %>% 
   inset_map(fill = "med_est_percdet", fill.lab = "% infections\ndetected", 
             plot.border = F, scale = F) -> perc_detect_space
 
@@ -595,10 +596,10 @@ png(here::here(figdir,"perc_detect_space_lag7.png"), height = 1500, width = 2000
 perc_detect_space
 dev.off()
 
-
 library(grid)
 library(gridExtra)
-png(here::here(figdir,"detect_space_rgn_time_layout.png"), height = 2600, width = 3000, res = 320)
+# png(here::here(figdir,"detect_space_rgn_time_layout.png"), height = 2600, width = 3000, res = 320)
+tiff(here::here("figures","paper","fig6.tif"), height = 2600, width = 3000, res = 320)
 gridExtra::grid.arrange(arrangeGrob(perc_detect_space,  left = textGrob("A",
                                                                               x = unit(0.5,"npc"),
                                                                               y = unit(0.9, "npc"),
@@ -676,7 +677,8 @@ cases %>%
                         week >= ymd("2020-05-18") ~ "Post-P2 expansion"),
               levels = c("Pre-P2 expansion","Post-P2 expansion"))) -> obs_wk
 
-png(here::here(figdir,"compare_lags.png"), height = 1400, width = 2200, res = 300)
+# png(here::here(figdir,"compare_lags.png"), height = 1400, width = 2200, res = 300)
+tiff(here::here("figures","paper","fig4.tif"), height = 1400, width = 2200, res = 300)
 ggplot(lagcomp, aes(week)) + 
   geom_ribbon(aes(ymin = l1, ymax = h1, fill = Lag), alpha = 0.2) +
   geom_ribbon(aes(ymin = l2, ymax = h2, fill = Lag), alpha = 0.2) +
