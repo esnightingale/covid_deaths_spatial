@@ -50,7 +50,9 @@ priors <- set_priors()
 ######################################
 
 median(dat$IMD)
+# 16.11325
 levels(dat$IMD_quint)
+# "(4.51,12.3]" "(12.3,20]"   "(20,27.7]"   "(27.7,35.4]" "(35.4,43.1]"
 
 setDF(dat) %>%
   mutate(prop_minority = median(prop_minority),
@@ -97,6 +99,38 @@ samples_pred <- inla.posterior.sample(n = nsims, fit_pred)
 
 saveRDS(list(fit = fit_pred, samples = samples_pred, dat = dat_pred), file = here::here("output","predict","fit_samples_avgcov.rds"))
 
+sims <- as.data.table(bind_cols(lapply(samples_pred, function(s) s$latent[(nrow(dat)+1):(2*nrow(dat))])))
+
+# ----- #
+
+setDT(dat)
+dat_sims <-  dplyr::bind_cols(dat[,.(geography, lad19cd, lad19nm, la, la_pop, week, E_wk, n)], 
+                              sims)
+dat_sims_long <- reshape2::melt(
+  dat_sims, 
+  id.vars = 1:9)
+setDT(dat_sims_long)
+
+dat_sims_long <- dat_sims_long[, pred_n := exp(value)*E_wk]
+
+dat_sims_la <- dat_sims_long[,.(pred_n = sum(pred_n), 
+                                 obs = sum(n, na.rm = T)), by = .(lad19nm, variable)] 
+dat_plot_la <- dat_sims_la[,.(`Predicted (averaged LTLA covariates)` = median(pred_n), 
+                                Observed = median(obs, na.rm = T)), by = .(lad19nm)] 
+dat_plot_la <- reshape2::melt(
+  dat_plot_la, 
+  id.vars = 1)
+
+regions %>%
+  full_join(dat_plot_la) %>%
+  basic_map(fill = "value", rate1e5 = TRUE, scale = FALSE, plot.border = FALSE) + 
+  facet_wrap(~variable) +
+  labs(title = "Predicted deaths per 100,000 with averaged LTLA covariate values", subtitle = "Median of 1000 posterior samples.", fill = "Incidence\nper 100,000") +
+  theme(legend.position = c(0.05,0.5)) -> pred_map
+
+png(here::here("figures","predict","pred_avgcov_la.png"), height = 1800, width = 2600, res = 300)
+pred_map
+dev.off()
 
 ######################################
 #   PREDICTION WITHOUT COVARIATES    #
