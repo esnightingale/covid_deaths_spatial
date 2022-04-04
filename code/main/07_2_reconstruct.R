@@ -24,10 +24,9 @@ cases <- readRDS(here::here("data","aggregated","cases.rds"))[[1]]
 deaths <- readRDS(here::here("data","aggregated","deaths.rds"))[[1]]
 
 # Sample of LAs to check reconstruction
-la_samp <- sample(unique(cases$lad19nm),9)
-la_samp
-# [1] "Knowsley"           "Winchester"         "Copeland"           "Southwark"          "Lewes"              "Bromsgrove"         "Forest of Dean"    
-# [8] "Broxbourne"         "North Warwickshire"
+# la_samp <- sample(unique(cases$lad19nm),9)
+la_samp <- c("Allerdale","Cornwall","Liverpool","Newcastle-under-Lyme","North Somerset","Rother","Southwark","Three Rivers","Watford")
+la_samp <- c("Cannock Chase","East Suffolk","Kirklees","Merton","Rotherham","South Holland","Stockport","Wigan","Wyre")
 
 # ---------------------------------------------------------------------------- #
 ## Reconstruct cases from predicted deaths ##
@@ -55,7 +54,7 @@ for (lag in c(7,14,21)){
 ## Plot for lag 7 ##
 
 reconstruct <- readRDS(here::here(outdir, "reconstruct_lag7.rds"))
-plot_reconst(reconstruct$la, 7, sample = la_samp, save = T, figdir = figdir, h = 10, w = 12)
+plot_reconst(reconstruct7$la, 7, sample = la_samp, save = T, figdir = figdir, h = 1200, w = 1800, res = 200)
 plot_reconst(reconstruct$total, 7, save = T, figdir = figdir, title = F, caption = F) 
 plot_reconst(reconstruct$geog, 7, save = T, figdir = figdir, title = F, caption = F)
 
@@ -65,7 +64,8 @@ plot_reconst(reconstruct$geog, 7, save = F, figdir = figdir, title = F, caption 
 geog <- geog + labs(y = "") + guides(shape = "none")
 
 png(here::here(figdir,"fig3.png"), height = 1200, width = 3200, res = 300)
-tot + geog
+# tiff(here::here("figures","paper","fig3.tif"), height = 1200, width = 3200, res = 300)
+tot + geog + plot_annotation(tag_levels = "A")
 dev.off()
 
 ###############################################################################
