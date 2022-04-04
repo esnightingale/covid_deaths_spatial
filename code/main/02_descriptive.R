@@ -28,6 +28,11 @@ regions.df <- sf::st_drop_geometry(regions)
 # DESCRIPTIVE SUMMARIES/PLOTS
 ################################################################################
 
+ggplot() +
+  geom_sf(data = regions, aes(geometry = geometry), fill = NA, col = "grey", colour = NA) +
+  map_theme() 
+ggsave(here::here(figdir, "ltla_map.png"), height = 6, width = 5)
+
 ## MAP TOTALS ##
 
 period <- cases[[3]][[1]]
@@ -48,6 +53,56 @@ deaths[[1]] %>%
 
 png(here::here(figdir,"map_totals.png"), height = 1000, width = 1500, res = 150)
 case_map + death_map
+dev.off()
+
+## TIME SERIES - TOTALS ##
+
+period <- deaths$breaks[[1]]
+
+deaths[[1]] %>%
+  group_by(w,week) %>%
+  summarise(n = sum(n, na.rm= T),
+            tot_pop = sum(la_pop)) %>%
+  ggplot(aes(week, n*1e5/tot_pop), col = "grey", lwd = 1.2) +
+  geom_line() +
+  labs(subtitle = "COVID-19-related deaths in England, by week of death",
+       x = "",
+       y = "Rate per 100,000") +
+  geom_vline(xintercept = ymd("2020-03-23"), lty = "dashed", lwd = 0.2) +
+  annotate("text", x = ymd("2020-03-22"), y = 10, label = "National lockdown enforced", cex = 2, hjust = "right") +
+  scale_x_date(date_minor_breaks = "1 week", 
+               date_breaks = "1 month",
+               date_labels = "%b",
+               limits = period) +
+  theme(legend.position = c(0.16,0.60), 
+        legend.text=element_text(size=8),  
+        legend.title=element_text(size=8)) -> ts_deaths
+
+cases[[1]] %>%
+  group_by(w,week) %>%
+  summarise(n = sum(n, na.rm= T),
+            tot_pop = sum(la_pop)) %>%
+  ggplot() +
+  geom_line(aes(week, n*1e5/tot_pop), col = "grey", lwd = 1.2) +
+  geom_vline(xintercept = ymd("2020-03-12"), lty = "dashed", lwd = 0.2) +
+  annotate("text", x = ymd("2020-03-13"), y = 25, label = "Community testing halted", cex = 2, hjust = "left",) +
+  geom_vline(xintercept = ymd("2020-03-23"), lty = "dashed", lwd = 0.2) +
+  annotate("text", x = ymd("2020-03-24"), y = 35, label = "National lockdown enforced", cex = 2, hjust = "left") +
+  geom_vline(xintercept = ymd("2020-04-15"), lty = "dashed", lwd = 0.2) +
+  annotate("text", x = ymd("2020-04-16"), y = 45, label = "P2 available to care home residents and staff", cex = 2, hjust = "left") +
+  geom_vline(xintercept = ymd("2020-05-18"), lty = "dashed", lwd = 0.2) +
+  annotate("text", x = ymd("2020-05-19"), y = 55, label = "P2 available to all symptomatic cases", cex = 2, hjust = "left") +
+  labs(subtitle = "Confirmed COVID-19 cases in England, by week of specimen",
+       x = "Calendar week",
+       y = "Rate per 100,000") +
+  scale_x_date(date_minor_breaks = "1 week", 
+               date_breaks = "1 month",
+               date_labels = "%b",
+               limits = period) -> ts_cases
+
+
+png(here::here(figdir,"fig1A.png"), height = 1200, width = 2000, res = 150)
+(ts_cases | case_map ) / (ts_deaths | death_map) + plot_layout(widths = c(2,1))
 dev.off()
 
 ## TIME SERIES - BY GEOGRAPHY ##
@@ -99,7 +154,10 @@ cases[[1]] %>%
 
 
 png(here::here(figdir,"fig1.png"), height = 1200, width = 2000, res = 150)
-(ts_geog_deaths | death_map) / (ts_geog_cases | case_map ) + plot_layout(widths = c(2,1))
+tiff(here::here("figures","paper","fig1.tif"), height = 1500, width = 2200, res = 200)
+(ts_geog_deaths | death_map) / (ts_geog_cases | case_map ) + 
+  plot_layout(widths = c(2,1)) +
+  plot_annotation(tag_levels = 'A')
 dev.off()
 
 # ---------------------------------------------------------------------------- #
@@ -107,9 +165,10 @@ dev.off()
 ## GEOGRAPHY ##
 
 png(here::here(figdir,"map_geog.png"), height = 800, width = 900, res = 150)
-regions %>% basic_map(fill = "geography") + scale_fill_viridis_d()
+regions %>% 
+  basic_map(fill = "geography") + 
+  scale_fill_discrete()
 dev.off()
-
 
 # ---------------------------------------------------------------------------- #
 
